@@ -215,6 +215,11 @@ h2 {
   box-shadow: 0 0 0 4px var(--amber-soft);
 }
 
+.status-dot.stale {
+  background: var(--amber);
+  box-shadow: 0 0 0 4px var(--amber-soft);
+}
+
 .status-dot.error {
   background: var(--red);
   box-shadow: 0 0 0 4px var(--red-soft);

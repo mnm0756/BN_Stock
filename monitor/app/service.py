@@ -26,6 +26,7 @@ class MonitorService:
             "status": "starting",
             "source": "none",
             "updated_at": None,
+            "last_attempt_at": None,
             "error": None,
             "opportunities": [],
             "positions": [],
@@ -48,10 +49,23 @@ class MonitorService:
                 else:
                     raw = await self.binance.fetch(symbols)
             except ProviderError as exc:
+                error_text = str(exc) or exc.__class__.__name__
                 if mode == "live":
-                    raw = {"source": "error", "records": [], "error": str(exc)}
+                    raw = {"source": "error", "records": [], "error": error_text}
+                elif self.snapshot.get("source") in {"live", "stale"} and self.snapshot.get("opportunities"):
+                    self.snapshot = {
+                        **self.snapshot,
+                        "status": "stale",
+                        "source": "stale",
+                        "error": error_text,
+                        "last_attempt_at": utc_now_iso(),
+                    }
+                    self.version += 1
+                    async with self.condition:
+                        self.condition.notify_all()
+                    return self.snapshot
                 else:
-                    raw = await self.demo.fetch(symbols, str(exc))
+                    raw = await self.demo.fetch(symbols, error_text)
 
             opportunities = self._build_opportunities(raw["records"], settings)
             positions = self._build_positions(opportunities, settings)
@@ -62,6 +76,7 @@ class MonitorService:
                 "status": "ok" if raw["source"] in {"live", "demo"} else "error",
                 "source": raw["source"],
                 "updated_at": utc_now_iso(),
+                "last_attempt_at": utc_now_iso(),
                 "error": raw.get("error"),
                 "opportunities": opportunities,
                 "positions": positions,

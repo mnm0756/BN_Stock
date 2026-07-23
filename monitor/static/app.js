@@ -154,16 +154,20 @@ function applySnapshot(snapshot) {
 
 function renderStatus() {
   const { source, updated_at: updatedAt, error } = state.snapshot;
-  const labels = { live: "实时行情", demo: "演示数据", error: "连接失败", none: "正在连接" };
+  const labels = { live: "实时行情", stale: "实时延迟", demo: "演示数据", error: "连接失败", none: "正在连接" };
   $("#source-label").textContent = labels[source] || "正在连接";
   $("#updated-label").textContent = updatedAt ? `${formatLocalTime(updatedAt)} 更新` : "--";
-  $("#source-dot").className = `status-dot ${source === "live" ? "live" : source === "demo" ? "demo" : "error"}`;
+  $("#source-dot").className = `status-dot ${source === "live" ? "live" : source === "stale" ? "stale" : source === "demo" ? "demo" : "error"}`;
   const banner = $("#data-banner");
-  if (source === "demo" || source === "error") {
+  if (source === "demo" || source === "error" || source === "stale") {
     banner.classList.remove("hidden");
-    $("#data-banner-text").textContent = source === "demo"
-      ? `当前显示演示数据，不可用于交易判断。${error ? `实时接口原因：${summarizeSourceError(error)}` : "已手动启用演示模式。"}`
-      : `实时行情不可用：${summarizeSourceError(error) || "未知错误"}`;
+    if (source === "stale") {
+      $("#data-banner-text").textContent = `实时刷新暂时失败，当前保留上一份真实行情，请核对 Binance 页面后再交易。原因：${summarizeSourceError(error) || "未知错误"}`;
+    } else if (source === "demo") {
+      $("#data-banner-text").textContent = `当前显示演示数据，不可用于交易判断。${error ? `实时接口原因：${summarizeSourceError(error)}` : "已手动启用演示模式。"}`;
+    } else {
+      $("#data-banner-text").textContent = `实时行情不可用：${summarizeSourceError(error) || "未知错误"}`;
+    }
   } else {
     banner.classList.add("hidden");
   }

@@ -28,6 +28,16 @@ class ProviderError(RuntimeError):
     pass
 
 
+def _describe_exception(exc: Exception) -> str:
+    message = str(exc).strip()
+    if message:
+        return message
+    name = exc.__class__.__name__
+    if isinstance(exc, httpx.HTTPError) and getattr(exc, "request", None):
+        return f"{name} while requesting {exc.request.url}"
+    return name
+
+
 class BinanceFuturesProvider:
     def __init__(self, base_url: str) -> None:
         self.base_url = base_url.rstrip("/")
@@ -53,7 +63,7 @@ class BinanceFuturesProvider:
                 )
                 histories = await self._funding_histories(client, symbols)
         except Exception as exc:
-            raise ProviderError(f"Binance public API unavailable: {exc}") from exc
+            raise ProviderError(f"Binance public API unavailable: {_describe_exception(exc)}") from exc
 
         premium_map = {item.get("symbol"): item for item in premium if isinstance(item, dict)}
         book_map = {item.get("symbol"): item for item in books if isinstance(item, dict)}
