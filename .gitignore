@@ -3,7 +3,9 @@ monitor/.env
 monitor/data/
 monitor/.pytest_cache/
 monitor/**/__pycache__/
+api/**/__pycache__/
 monitor/**/*.pyc
+api/**/*.pyc
 *.log
 *.db
 .DS_Store
