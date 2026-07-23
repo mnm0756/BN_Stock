@@ -213,7 +213,7 @@ function filteredOpportunities() {
   const minAnnualized = Number($("#min-annualized").value) / 100;
   return state.snapshot.opportunities.filter((item) => {
     const matchesQuery = !query || item.symbol.toLowerCase().includes(query) || item.name.toLowerCase().includes(query);
-    return matchesQuery && item.annualized_7d >= minAnnualized;
+    return matchesQuery && item.annualized_current >= minAnnualized;
   });
 }
 
@@ -266,7 +266,7 @@ function renderOpportunities() {
   if (rows.length === 0) {
     const allRows = state.snapshot?.opportunities || [];
     const minAnnualized = Number($("#min-annualized").value) / 100;
-    const bestAnnualized = allRows.reduce((best, item) => Math.max(best, Number(item.annualized_7d || 0)), 0);
+    const bestAnnualized = allRows.reduce((best, item) => Math.max(best, Number(item.annualized_current || 0)), 0);
     $("#empty-opportunities span").textContent = allRows.length
       ? `当前筛选为不低于 ${percent(minAnnualized, 0)}，最高只有 ${percent(bestAnnualized)}`
       : "等待行情更新";
@@ -282,7 +282,7 @@ function renderOpportunities() {
         </div>
       </td>
       <td><div class="value-stack"><strong class="${valueClass(item.funding_rate)}">${percent(item.funding_rate, 4)}</strong><small>每 ${item.funding_interval_hours} 小时</small></div></td>
-      <td><div class="value-stack"><strong class="${valueClass(item.annualized_7d)}">${percent(item.annualized_7d)}</strong><small>当前 ${percent(item.annualized_current)}</small></div></td>
+      <td><div class="value-stack"><strong class="${valueClass(item.annualized_7d)}">${percent(item.annualized_7d)}</strong><small>不参与收益估算</small></div></td>
       <td><strong class="${valueClass(item.entry_basis_bps)}">${bps(item.entry_basis_bps)}</strong></td>
       <td><div class="value-stack"><strong>${price(item.spot_ask)} / ${price(item.perp_bid)}</strong><small>指数参考 / 合约 Bid</small></div></td>
       <td><div class="value-stack"><strong class="negative">-${money(costs.total)}</strong><small>股 ${money(costs.spot)} / 合 ${money(costs.perp)} / 滑 ${money(costs.slippage)}</small><small>其 ${money(costs.extra)} / ${percent(costs.costPctOfHedge)} 名义</small></div></td>
@@ -313,7 +313,7 @@ function renderDetail() {
   const spotBudget = Number(settings.total_capital || 0) * (1 - Number(settings.perp_allocation || 0));
   const perpBudget = Number(settings.total_capital || 0) * Number(settings.perp_allocation || 0);
   const fundingEvents = Number(settings.holding_days || 0) * 24 / Math.max(Number(item.funding_interval_hours || 0), 0.001);
-  const averageFundingRate = projection.hedge_notional && fundingEvents
+  const fundingRateUsed = projection.hedge_notional && fundingEvents
     ? Number(projection.gross_funding || 0) / Number(projection.hedge_notional) / fundingEvents
     : 0;
   const maxRate = Math.max(...item.history_rates.map((value) => Math.abs(value)), 0.000001);
@@ -337,7 +337,7 @@ function renderDetail() {
         <div class="detail-block-title">资金费</div>
         <div class="detail-rate">
           <div><span>当前年化</span><strong class="${valueClass(item.annualized_current)}">${percent(item.annualized_current)}</strong></div>
-          <div><span>7 日年化</span><strong class="${valueClass(item.annualized_7d)}">${percent(item.annualized_7d)}</strong></div>
+          <div><span>近7日历史年化</span><strong class="${valueClass(item.annualized_7d)}">${percent(item.annualized_7d)}</strong></div>
         </div>
         <div class="history-bars" aria-label="最近21次资金费">${bars}</div>
       </div>
@@ -350,7 +350,7 @@ function renderDetail() {
       </div>
       <div class="detail-block">
         <div class="detail-block-title">持有期收益拆解</div>
-        <div class="metric-row"><span>预估资金费</span><strong>${money(projection.gross_funding)}</strong></div>
+        <div class="metric-row"><span>按当前费率预估资金费</span><strong>${money(projection.gross_funding)}</strong></div>
         <div class="metric-row"><span>入场价差贡献</span><strong class="${valueClass(projection.entry_basis_pnl)}">${money(projection.entry_basis_pnl)}</strong></div>
         <div class="metric-row"><span>美股平台费/价差 买+卖</span><strong class="negative">-${money(costs.spot)}</strong></div>
         <div class="metric-row"><span>合约手续费 开+平</span><strong class="negative">-${money(costs.perp)}</strong></div>
@@ -372,7 +372,7 @@ function renderDetail() {
         <div class="detail-block-title">测算公式</div>
         <div class="formula-stack">
           <div class="formula-line"><span>对冲名义</span><strong>min(总资金 × 合约占比, 总资金 × 现货占比)</strong><em>min(${money(perpBudget)}, ${money(spotBudget)}) = ${money(projection.hedge_notional)}</em></div>
-          <div class="formula-line"><span>资金费</span><strong>对冲名义 × 平均资金费率 × 结算次数</strong><em>${money(projection.hedge_notional)} × ${percent(averageFundingRate, 4)} × ${fundingEvents.toFixed(1)} = ${money(projection.gross_funding)}</em></div>
+          <div class="formula-line"><span>资金费</span><strong>对冲名义 × 当前资金费率 × 结算次数</strong><em>${money(projection.hedge_notional)} × ${percent(fundingRateUsed, 4)} × ${fundingEvents.toFixed(1)} = ${money(projection.gross_funding)}</em></div>
           <div class="formula-line"><span>价差贡献</span><strong>对冲名义 × 入场价差 bps / 10000</strong><em>${money(projection.hedge_notional)} × ${Number(item.entry_basis_bps || 0).toFixed(1)} / 10000 = ${money(projection.entry_basis_pnl)}</em></div>
           <div class="formula-line"><span>单边费用</span><strong>美股平台费/价差 + 合约费 + 滑点 + 额外预留</strong><em>${money(projection.spot_open_fee)} + ${money(projection.perp_open_fee)} + ${money(projection.slippage_open)} + ${money(projection.extra_open_fee)} = ${money(projection.opening_cost)}</em></div>
           <div class="formula-line"><span>总费用</span><strong>2 × 单边费用</strong><em>2 × ${money(projection.opening_cost)} = ${money(costs.total)}</em></div>
@@ -622,10 +622,10 @@ function maybeNotify() {
   if (!state.notifications || Notification.permission !== "granted" || state.snapshot.source !== "live") return;
   const threshold = state.snapshot.settings.alert_annualized;
   for (const item of state.snapshot.opportunities) {
-    const key = `${item.symbol}:${Math.floor(item.annualized_7d * 20)}`;
-    if (item.annualized_7d >= threshold && !state.lastAlerted.has(key)) {
+    const key = `${item.symbol}:${Math.floor(item.annualized_current * 20)}`;
+    if (item.annualized_current >= threshold && !state.lastAlerted.has(key)) {
       new Notification(`${item.ticker} 资金费机会`, {
-        body: `7日年化 ${percent(item.annualized_7d)}，持有期净收益预估 ${money(item.projection.net_profit)}`,
+        body: `当前年化 ${percent(item.annualized_current)}，持有期净收益预估 ${money(item.projection.net_profit)}`,
       });
       state.lastAlerted.add(key);
     }

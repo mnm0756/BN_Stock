@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="light" />
     <title>BN Stock Carry</title>
     <link rel="preconnect" href="https://cdn.jsdelivr.net" />
-    <link rel="stylesheet" href="/static/styles.css?v=1.0.10" />
+    <link rel="stylesheet" href="/static/styles.css?v=1.0.11" />
   </head>
   <body>
     <div class="app-shell">
@@ -59,7 +59,7 @@
             <small id="kpi-profitable-count">-- 个费用后为正</small>
           </article>
           <article class="kpi-item accent-green">
-            <span class="kpi-label">7日费率最高</span>
+            <span class="kpi-label">当前费率最高</span>
             <strong id="kpi-best-annualized">--</strong>
             <small id="kpi-best-symbol">--</small>
           </article>
@@ -101,7 +101,7 @@
 
               <div class="field-group">
                 <div class="field-line">
-                  <label for="min-annualized">最低 7 日年化</label>
+                  <label for="min-annualized">最低当前年化</label>
                   <output id="min-annualized-output">0%</output>
                 </div>
                 <input id="min-annualized" type="range" min="-20" max="300" value="0" step="5" />
@@ -170,7 +170,7 @@
                     <tr>
                       <th>标的</th>
                       <th>当前资金费</th>
-                      <th>7 日年化</th>
+                      <th>近7日历史</th>
                       <th>入场价差</th>
                       <th>参考现货 / 合约卖价</th>
                       <th>预估费用</th>
@@ -352,6 +352,6 @@
     <div id="toast-region" class="toast-region" aria-live="polite"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
-    <script src="/static/app.js?v=1.0.10" defer></script>
+    <script src="/static/app.js?v=1.0.11" defer></script>
   </body>
 </html>

@@ -85,7 +85,7 @@ class MonitorService:
                     "market_count": len(opportunities),
                     "profitable_count": len(profitable),
                     "best_symbol": best["symbol"] if best else None,
-                    "best_annualized": best["annualized_7d"] if best else 0,
+                    "best_annualized": best["annualized_current"] if best else 0,
                     "best_projected_profit": best["projection"]["net_profit"] if best else 0,
                     "position_count": len(positions),
                     "position_net_pnl": total_pnl,
@@ -125,9 +125,7 @@ class MonitorService:
                     total_capital=settings["total_capital"],
                     perp_allocation=settings["perp_allocation"],
                     holding_days=settings["holding_days"],
-                    funding_rate=(sum(row["history_rates"]) / len(row["history_rates"]))
-                    if row["history_rates"]
-                    else row["funding_rate"],
+                    funding_rate=row["funding_rate"],
                     interval_hours=row["funding_interval_hours"],
                     spot_fee_rate=settings["spot_fee_rate"],
                     spot_min_fee=settings["spot_min_fee"],
@@ -139,8 +137,10 @@ class MonitorService:
                 )
             )
             risk_flags = []
-            if row["funding_rate"] <= 0:
+            if row["funding_rate"] < 0:
                 risk_flags.append("负资金费")
+            elif abs(row["funding_rate"]) < 1e-12:
+                risk_flags.append("当前为0")
             if current_annualized > 2:
                 risk_flags.append("费率过热")
             if abs(entry_basis_bps) > 100:
@@ -163,7 +163,11 @@ class MonitorService:
             )
         return sorted(
             result,
-            key=lambda item: (item["projection"]["net_profit"], item["annualized_7d"]),
+            key=lambda item: (
+                item["projection"]["net_profit"],
+                item["annualized_current"],
+                item["annualized_7d"],
+            ),
             reverse=True,
         )
 
