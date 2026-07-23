@@ -1,0 +1,10 @@
+doc/
+monitor/.env
+monitor/data/
+monitor/.pytest_cache/
+monitor/**/__pycache__/
+monitor/**/*.pyc
+*.log
+*.db
+.DS_Store
+Thumbs.db

@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <title>BN Stock Carry</title>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+    <link rel="stylesheet" href="/static/styles.css?v=1.0.8" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-block">
+          <div class="brand-mark" aria-hidden="true">BN</div>
+          <div>
+            <h1>BN Stock Carry</h1>
+            <p>美股现货 × TradFi 合约</p>
+          </div>
+        </div>
+
+        <nav class="view-tabs" aria-label="页面">
+          <button class="view-tab active" data-view="scanner">
+            <i data-lucide="radar"></i><span>机会扫描</span>
+          </button>
+          <button class="view-tab" data-view="positions">
+            <i data-lucide="briefcase-business"></i><span>我的持仓</span>
+            <span id="position-count-badge" class="count-badge">0</span>
+          </button>
+        </nav>
+
+        <div class="top-actions">
+          <div class="feed-state">
+            <span id="source-dot" class="status-dot waiting"></span>
+            <div>
+              <strong id="source-label">正在连接</strong>
+              <span id="updated-label">--</span>
+            </div>
+          </div>
+          <button id="refresh-btn" class="icon-button" title="立即刷新" aria-label="立即刷新">
+            <i data-lucide="refresh-cw"></i>
+          </button>
+          <button id="settings-btn" class="icon-button" title="设置" aria-label="设置">
+            <i data-lucide="settings-2"></i>
+          </button>
+        </div>
+      </header>
+
+      <div id="data-banner" class="data-banner hidden" role="status">
+        <i data-lucide="triangle-alert"></i>
+        <span id="data-banner-text"></span>
+      </div>
+
+      <main>
+        <section class="kpi-strip" aria-label="监控摘要">
+          <article class="kpi-item">
+            <span class="kpi-label">监控合约</span>
+            <strong id="kpi-market-count">--</strong>
+            <small id="kpi-profitable-count">-- 个费用后为正</small>
+          </article>
+          <article class="kpi-item accent-green">
+            <span class="kpi-label">7日费率最高</span>
+            <strong id="kpi-best-annualized">--</strong>
+            <small id="kpi-best-symbol">--</small>
+          </article>
+          <article class="kpi-item accent-blue">
+            <span class="kpi-label">持有期预估净收益</span>
+            <strong id="kpi-best-profit">--</strong>
+            <small id="kpi-holding-days">--</small>
+          </article>
+          <article class="kpi-item accent-amber">
+            <span class="kpi-label">下次资金费</span>
+            <strong id="kpi-countdown">--:--:--</strong>
+            <small id="kpi-funding-time">--</small>
+          </article>
+          <article class="kpi-item accent-violet">
+            <span class="kpi-label">持仓净利润</span>
+            <strong id="kpi-position-pnl">$0.00</strong>
+            <small id="kpi-position-count">0 个组合</small>
+          </article>
+        </section>
+
+        <section id="scanner-view" class="view-section active">
+          <div class="scanner-grid">
+            <aside class="filter-panel">
+              <div class="panel-heading">
+                <div>
+                  <span class="eyebrow">筛选与测算</span>
+                  <h2>机会参数</h2>
+                </div>
+                <button id="reset-filter-btn" class="icon-button small" title="重置筛选" aria-label="重置筛选">
+                  <i data-lucide="rotate-ccw"></i>
+                </button>
+              </div>
+
+              <label class="field-label" for="search-input">标的</label>
+              <div class="input-with-icon">
+                <i data-lucide="search"></i>
+                <input id="search-input" type="search" placeholder="代码或名称" autocomplete="off" />
+              </div>
+
+              <div class="field-group">
+                <div class="field-line">
+                  <label for="min-annualized">最低 7 日年化</label>
+                  <output id="min-annualized-output">0%</output>
+                </div>
+                <input id="min-annualized" type="range" min="-20" max="300" value="0" step="5" />
+              </div>
+
+              <div class="field-group split-fields">
+                <label>
+                  <span>总资金 USDT</span>
+                  <input id="capital-input" type="number" min="10" step="100" value="1000" />
+                </label>
+                <label>
+                  <span>持有天数</span>
+                  <input id="holding-days-input" type="number" min="1" max="365" value="30" />
+                </label>
+              </div>
+
+              <div class="field-group">
+                <div class="field-line">
+                  <label for="allocation-input">合约保证金占比</label>
+                  <output id="allocation-output">50%</output>
+                </div>
+                <input id="allocation-input" type="range" min="10" max="90" value="50" step="5" />
+                <div class="allocation-rail" aria-hidden="true">
+                  <span id="spot-allocation-label">现货 50%</span>
+                  <span id="perp-allocation-label">合约 50%</span>
+                </div>
+              </div>
+
+              <div class="segmented-control" aria-label="执行方式">
+                <button class="segment active" data-execution="maker">挂单</button>
+                <button class="segment" data-execution="taker">吃单</button>
+              </div>
+
+              <label class="toggle-line">
+                <span>
+                  <strong>桌面提醒</strong>
+                  <small>超过提醒年化时通知</small>
+                </span>
+                <input id="notification-toggle" type="checkbox" />
+                <span class="toggle-control"></span>
+              </label>
+
+              <div class="source-note">
+                <i data-lucide="info"></i>
+                <p>现货列使用 Binance 合约指数参考价。持仓可手工覆盖为真实现货价。</p>
+              </div>
+            </aside>
+
+            <section class="opportunity-panel">
+              <div class="section-toolbar">
+                <div>
+                  <span class="eyebrow">按费用后净收益排序</span>
+                  <h2>资金费机会</h2>
+                </div>
+                <div class="toolbar-meta">
+                  <span id="visible-count">0 个结果</span>
+                  <button id="add-position-top" class="command-button">
+                    <i data-lucide="plus"></i><span>登记持仓</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="table-wrap">
+                <table class="opportunity-table">
+                  <thead>
+                    <tr>
+                      <th>标的</th>
+                      <th>当前资金费</th>
+                      <th>7 日年化</th>
+                      <th>入场价差</th>
+                      <th>参考现货 / 合约卖价</th>
+                      <th>预估费用</th>
+                      <th>预估净收益</th>
+                      <th>风险</th>
+                    </tr>
+                  </thead>
+                  <tbody id="opportunity-body">
+                    <tr class="loading-row"><td colspan="8">正在载入行情…</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div id="empty-opportunities" class="empty-state hidden">
+                <i data-lucide="filter-x"></i>
+                <strong>没有符合条件的标的</strong>
+                <span>调整筛选阈值后会自动更新</span>
+              </div>
+            </section>
+
+            <aside id="detail-panel" class="detail-panel">
+              <div class="empty-detail">
+                <i data-lucide="mouse-pointer-2"></i>
+                <strong>选择一条机会</strong>
+                <span>查看资金费、价差和费用拆解</span>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <section id="positions-view" class="view-section">
+          <div class="positions-header">
+            <div>
+              <span class="eyebrow">按立即平仓估值</span>
+              <h2>套利持仓</h2>
+            </div>
+            <button id="add-position-btn" class="command-button primary">
+              <i data-lucide="plus"></i><span>登记持仓</span>
+            </button>
+          </div>
+          <div id="positions-grid" class="positions-grid"></div>
+          <div id="empty-positions" class="empty-state positions-empty">
+            <i data-lucide="briefcase-business"></i>
+            <strong>还没有登记持仓</strong>
+            <span>登记两条腿的成交价后开始追踪净利润</span>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="settings-dialog" class="modal-dialog">
+      <form id="settings-form" method="dialog">
+        <div class="modal-header">
+          <div>
+            <span class="eyebrow">监控配置</span>
+            <h2>设置</h2>
+          </div>
+          <button type="button" class="icon-button close-dialog" title="关闭" aria-label="关闭">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <div class="modal-body settings-layout">
+          <label>
+            <span>数据模式</span>
+            <select id="provider-mode-input">
+              <option value="auto">自动（实时失败后演示）</option>
+              <option value="live">仅实时</option>
+              <option value="demo">仅演示</option>
+            </select>
+          </label>
+          <label>
+            <span>刷新间隔（秒）</span>
+            <input id="refresh-seconds-input" type="number" min="5" max="300" />
+          </label>
+          <label>
+            <span>美股价差费率</span>
+            <input id="spot-fee-input" type="number" min="0" max="0.1" step="0.0001" />
+          </label>
+          <label>
+            <span>美股最低平台费</span>
+            <input id="spot-min-fee-input" type="number" min="0" step="0.01" />
+          </label>
+          <label>
+            <span>合约挂单费率</span>
+            <input id="maker-fee-input" type="number" min="-0.01" max="0.1" step="0.0001" />
+          </label>
+          <label>
+            <span>合约吃单费率</span>
+            <input id="taker-fee-input" type="number" min="0" max="0.1" step="0.0001" />
+          </label>
+          <label>
+            <span>单边滑点（bps）</span>
+            <input id="slippage-input" type="number" min="0" max="1000" step="0.5" />
+          </label>
+          <label>
+            <span>额外单边成本（bps）</span>
+            <input id="extra-cost-bps-input" type="number" min="0" max="1000" step="0.5" />
+          </label>
+          <label>
+            <span>额外单边固定成本</span>
+            <input id="extra-fixed-fee-input" type="number" min="0" max="1000" step="0.01" />
+          </label>
+          <label>
+            <span>提醒年化</span>
+            <input id="alert-input" type="number" min="-10" max="20" step="0.05" />
+          </label>
+          <label class="wide-field">
+            <span>监控合约（逗号分隔）</span>
+            <textarea id="symbols-input" rows="3"></textarea>
+          </label>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="secondary-button close-dialog">取消</button>
+          <button type="submit" class="command-button primary">
+            <i data-lucide="save"></i><span>保存设置</span>
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="position-dialog" class="modal-dialog position-dialog">
+      <form id="position-form" method="dialog">
+        <input id="position-id-input" type="hidden" />
+        <div class="modal-header">
+          <div>
+            <span class="eyebrow">现货多头 + 合约空头</span>
+            <h2 id="position-dialog-title">登记持仓</h2>
+          </div>
+          <button type="button" class="icon-button close-dialog" title="关闭" aria-label="关闭">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <div class="modal-body position-layout">
+          <label>
+            <span>合约代码</span>
+            <input id="position-symbol-input" type="text" required placeholder="MUUSDT" />
+          </label>
+          <label>
+            <span>股票数量</span>
+            <input id="position-quantity-input" type="number" min="0.000001" step="any" required />
+          </label>
+          <label>
+            <span>现货买入价</span>
+            <input id="position-spot-entry-input" type="number" min="0.000001" step="any" required />
+          </label>
+          <label>
+            <span>合约做空价</span>
+            <input id="position-perp-entry-input" type="number" min="0.000001" step="any" required />
+          </label>
+          <label>
+            <span>开仓时间</span>
+            <input id="position-opened-input" type="datetime-local" required />
+          </label>
+          <label>
+            <span>累计已收资金费</span>
+            <input id="position-funding-input" type="number" step="any" value="0" />
+          </label>
+          <label>
+            <span>累计开仓费用</span>
+            <input id="position-fees-input" type="number" min="0" step="any" value="0" />
+          </label>
+          <label>
+            <span>真实现货价（可空）</span>
+            <input id="position-spot-override-input" type="number" min="0.000001" step="any" placeholder="空值使用指数参考价" />
+          </label>
+          <label class="wide-field">
+            <span>备注</span>
+            <textarea id="position-note-input" rows="2" maxlength="300"></textarea>
+          </label>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="secondary-button close-dialog">取消</button>
+          <button type="submit" class="command-button primary">
+            <i data-lucide="save"></i><span>保存持仓</span>
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <div id="toast-region" class="toast-region" aria-live="polite"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+    <script src="/static/app.js?v=1.0.8" defer></script>
+  </body>
+</html>
