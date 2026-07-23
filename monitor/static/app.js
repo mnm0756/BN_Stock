@@ -65,6 +65,28 @@ const FEE_SOURCES = [
   },
 ];
 
+function binanceStockUrl(item) {
+  return `https://www.binance.com/en/stocks/EQ_${encodeURIComponent(item.ticker)}`;
+}
+
+function binanceFuturesUrl(item) {
+  return `https://www.binance.com/en/futures/${encodeURIComponent(item.symbol)}`;
+}
+
+function marketLinks(item, tone = "compact") {
+  const labelClass = tone === "full" ? " full" : "";
+  return `
+    <div class="market-links${labelClass}">
+      <a class="market-link stock" href="${binanceStockUrl(item)}" target="_blank" rel="noreferrer" title="打开 Binance 美股现货 ${escapeHtml(item.ticker)}">
+        <i data-lucide="external-link"></i><span>现货</span>
+      </a>
+      <a class="market-link futures" href="${binanceFuturesUrl(item)}" target="_blank" rel="noreferrer" title="打开 Binance 合约 ${escapeHtml(item.symbol)}">
+        <i data-lucide="external-link"></i><span>合约</span>
+      </a>
+    </div>
+  `;
+}
+
 async function api(path, options = {}) {
   const response = await fetch(path, {
     headers: { "Content-Type": "application/json", ...(options.headers || {}) },
@@ -252,7 +274,7 @@ function renderOpportunities() {
       <td>
         <div class="symbol-cell">
           <span class="ticker-mark">${escapeHtml(item.ticker.slice(0, 4))}</span>
-          <span><strong>${escapeHtml(item.ticker)}</strong><small>${escapeHtml(item.name)}</small></span>
+          <span><strong>${escapeHtml(item.ticker)}</strong><small>${escapeHtml(item.name)}</small>${marketLinks(item)}</span>
         </div>
       </td>
       <td><div class="value-stack"><strong class="${valueClass(item.funding_rate)}">${percent(item.funding_rate, 4)}</strong><small>每 ${item.funding_interval_hours} 小时</small></div></td>
@@ -265,6 +287,7 @@ function renderOpportunities() {
     </tr>
   `;
   }).join("");
+  $$(".market-link").forEach((link) => link.addEventListener("click", (event) => event.stopPropagation()));
   $$(".opportunity-row").forEach((row) => row.addEventListener("click", () => {
     state.selectedSymbol = row.dataset.symbol;
     renderOpportunities();
@@ -301,7 +324,10 @@ function renderDetail() {
           <span class="ticker-mark">${escapeHtml(item.ticker.slice(0, 4))}</span>
           <div><h2>${escapeHtml(item.ticker)}</h2><span class="eyebrow">${escapeHtml(item.name)}</span></div>
         </div>
-        <span class="source-chip">指数参考现货</span>
+        <div class="detail-title-actions">
+          <span class="source-chip">指数参考现货</span>
+          ${marketLinks(item, "full")}
+        </div>
       </div>
       <div class="detail-block">
         <div class="detail-block-title">资金费</div>
@@ -359,6 +385,7 @@ function renderDetail() {
       </div>
     </div>`;
   $("[data-add-symbol]").addEventListener("click", () => openPositionDialog(item.symbol));
+  $$("#detail-panel .market-link").forEach((link) => link.addEventListener("click", (event) => event.stopPropagation()));
 }
 
 function renderPositions() {

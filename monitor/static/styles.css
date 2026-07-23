@@ -660,6 +660,55 @@ td {
   gap: 8px;
 }
 
+.market-links {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 5px;
+}
+
+.market-links.full {
+  margin-top: 0;
+}
+
+.market-link {
+  min-height: 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 750;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.market-link svg {
+  width: 12px;
+  height: 12px;
+}
+
+.market-link.stock {
+  background: var(--green-soft);
+  border-color: #ccebd9;
+  color: var(--green);
+}
+
+.market-link.futures {
+  background: var(--red-soft);
+  border-color: #f5d1d1;
+  color: var(--red);
+}
+
+.market-link:hover {
+  filter: brightness(0.98);
+}
+
 .ticker-mark {
   width: 30px;
   height: 30px;
@@ -782,6 +831,14 @@ td {
   display: flex;
   align-items: center;
   gap: 9px;
+}
+
+.detail-title-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 7px;
 }
 
 .detail-title h2 {
