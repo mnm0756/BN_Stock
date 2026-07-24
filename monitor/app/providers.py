@@ -154,7 +154,16 @@ class BinanceOkxFundingProvider:
             okx_book = okx_ticker_map.get(inst_id)
             if not binance_price or not binance_book or not okx_rate or not okx_book:
                 continue
-            record = self._record(symbol, inst_id, binance_price, binance_book, okx_rate, okx_book, histories)
+            record = self._record(
+                symbol,
+                inst_id,
+                binance_price,
+                binance_book,
+                okx_rate,
+                okx_book,
+                interval_map.get(symbol, 8.0),
+                histories,
+            )
             if record:
                 records.append(record)
         if not records:
@@ -240,11 +249,12 @@ class BinanceOkxFundingProvider:
         binance_book: dict[str, Any],
         okx_rate: dict[str, Any],
         okx_book: dict[str, Any],
+        binance_interval: float,
         histories: dict[str, dict[str, list[dict[str, Any]]]],
     ) -> dict[str, Any] | None:
         binance_rate = _float(binance_price.get("lastFundingRate"))
         okx_current = _float(okx_rate.get("fundingRate"))
-        binance_interval = 8.0
+        binance_interval = binance_interval if binance_interval > 0 else 8.0
         okx_interval = (
             (_int(okx_rate.get("nextFundingTime")) - _int(okx_rate.get("fundingTime"))) / 3_600_000
             if _int(okx_rate.get("nextFundingTime")) and _int(okx_rate.get("fundingTime"))
@@ -277,8 +287,8 @@ class BinanceOkxFundingProvider:
 
         spread_annualized = abs(binance_annualized - okx_annualized)
         spread_rate_8h = spread_annualized / (365 * 3)
-        history_rates = self._spread_history_rates(symbol)
-        historical_annualized = annualize_average(history_rates, 8.0)
+        historical_annualized = self._spread_history_annualized(symbol, binance_interval, okx_interval)
+        history_rates = self._spread_history_rates(symbol, binance_interval, okx_interval)
         entry_basis_bps = (short_bid / long_ask - 1) * 10_000
         funding_times = [
             value
@@ -319,7 +329,11 @@ class BinanceOkxFundingProvider:
             "history": histories["binance"].get(symbol, []),
         }
 
-    def _spread_history_rates(self, symbol: str) -> list[float]:
+    def _spread_history_annualized(self, symbol: str, binance_interval: float, okx_interval: float) -> float:
+        rates = self._spread_history_rates(symbol, binance_interval, okx_interval)
+        return annualize_average(rates, 8.0)
+
+    def _spread_history_rates(self, symbol: str, binance_interval: float, okx_interval: float) -> list[float]:
         _, cached = self._history_cache
         binance_rows = cached["binance"].get(symbol, [])
         okx_rows = cached["okx"].get(symbol, [])
@@ -333,7 +347,11 @@ class BinanceOkxFundingProvider:
             okx_rate = okx_by_time.get(timestamp)
             if okx_rate is None:
                 continue
-            rates.append(abs(_float(row.get("fundingRate")) - okx_rate))
+            spread_annualized = abs(
+                annualize_funding(_float(row.get("fundingRate")), binance_interval)
+                - annualize_funding(okx_rate, okx_interval)
+            )
+            rates.append(spread_annualized / (365 * 3))
         return rates[-21:]
 
 

@@ -42,6 +42,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "SUIUSDT",
         "LTCUSDT",
         "BCHUSDT",
+        "BARDUSDT",
     ],
 }
 
