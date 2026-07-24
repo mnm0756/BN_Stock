@@ -28,6 +28,11 @@ const percent = (value, digits = 2) => `${(Number(value || 0) * 100).toFixed(dig
 const bps = (value) => `${Number(value || 0) >= 0 ? "+" : ""}${Number(value || 0).toFixed(1)} bps`;
 const valueClass = (value) => (Number(value) > 0 ? "positive" : Number(value) < 0 ? "negative" : "neutral");
 const signedMoney = (value) => `${Number(value || 0) >= 0 ? "+" : "-"} ${money(Math.abs(Number(value || 0)))}`;
+const hours = (value) => {
+  const number = Number(value || 0);
+  if (!number) return "--";
+  return `${Number.isInteger(number) ? number.toFixed(0) : number.toFixed(1)}h`;
+};
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (char) => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;",
 }[char]));
@@ -281,9 +286,9 @@ function renderOpportunities() {
           <span><strong>${escapeHtml(item.ticker)}</strong><small>${escapeHtml(item.name)}</small>${marketLinks(item)}</span>
         </div>
       </td>
-      <td><div class="value-stack"><strong class="${valueClass(item.funding_rate)}">${percent(item.funding_rate, 4)}</strong><small>当前年化 ${percent(item.annualized_current)}</small></div></td>
-      <td><div class="value-stack"><strong>${percent(item.binance_funding_rate, 4)} / ${percent(item.okx_funding_rate, 4)}</strong><small>近7日差 ${percent(item.annualized_7d)}</small></div></td>
-      <td><div class="value-stack"><strong>${escapeHtml(item.short_exchange)} 空 / ${escapeHtml(item.long_exchange)} 多</strong><small>收 ${percent(item.short_rate, 4)}，付 ${percent(item.long_rate, 4)}</small></div></td>
+      <td><div class="value-stack"><strong class="${valueClass(item.funding_rate)}">${percent(item.funding_rate, 4)}</strong><small>折算年化 ${percent(item.annualized_current)}</small></div></td>
+      <td><div class="value-stack"><strong>${percent(item.binance_funding_rate, 4)} / ${percent(item.okx_funding_rate, 4)}</strong><small>周期 ${hours(item.binance_funding_interval_hours)} / ${hours(item.okx_funding_interval_hours)}</small><small>年化 ${percent(item.binance_annualized)} / ${percent(item.okx_annualized)}</small></div></td>
+      <td><div class="value-stack"><strong>${escapeHtml(item.short_exchange)} 空 / ${escapeHtml(item.long_exchange)} 多</strong><small>空腿费率 ${percent(item.short_rate, 4)}，多腿费率 ${percent(item.long_rate, 4)}</small></div></td>
       <td><div class="value-stack"><strong>${price(item.short_bid)} / ${price(item.long_ask)}</strong><small>空方 Bid / 多方 Ask，${bps(item.entry_basis_bps)}</small></div></td>
       <td><div class="value-stack"><strong class="negative">-${money(costs.total)}</strong><small>BN ${money(costs.binance)} / OKX ${money(costs.okx)} / 滑 ${money(costs.slippage)}</small><small>其 ${money(costs.extra)} / ${percent(costs.costPctOfHedge)} 名义</small></div></td>
       <td><div class="value-stack"><strong class="${valueClass(item.projection.net_profit)}">${money(item.projection.net_profit)}</strong><small>${percent(item.projection.return_pct)} / 持有期</small></div></td>
@@ -336,8 +341,10 @@ function renderDetail() {
           <div><span>当前费差年化</span><strong class="${valueClass(item.annualized_current)}">${percent(item.annualized_current)}</strong></div>
           <div><span>近7日费差年化</span><strong class="${valueClass(item.annualized_7d)}">${percent(item.annualized_7d)}</strong></div>
         </div>
-        <div class="metric-row"><span>Binance 当前资金费</span><strong class="${valueClass(item.binance_funding_rate)}">${percent(item.binance_funding_rate, 4)}</strong></div>
-        <div class="metric-row"><span>OKX 当前资金费</span><strong class="${valueClass(item.okx_funding_rate)}">${percent(item.okx_funding_rate, 4)}</strong></div>
+        <div class="metric-row"><span>Binance 当前资金费</span><strong class="${valueClass(item.binance_funding_rate)}">${percent(item.binance_funding_rate, 4)} / ${hours(item.binance_funding_interval_hours)}</strong></div>
+        <div class="metric-row"><span>OKX 当前资金费</span><strong class="${valueClass(item.okx_funding_rate)}">${percent(item.okx_funding_rate, 4)} / ${hours(item.okx_funding_interval_hours)}</strong></div>
+        <div class="metric-row"><span>Binance 年化后资金费</span><strong class="${valueClass(item.binance_annualized)}">${percent(item.binance_annualized)}</strong></div>
+        <div class="metric-row"><span>OKX 年化后资金费</span><strong class="${valueClass(item.okx_annualized)}">${percent(item.okx_annualized)}</strong></div>
         <div class="history-bars" aria-label="最近21次跨所资金费差">${bars}</div>
       </div>
       <div class="detail-block">
@@ -371,6 +378,7 @@ function renderDetail() {
         <div class="detail-block-title">测算公式</div>
         <div class="formula-stack">
           <div class="formula-line"><span>对冲名义</span><strong>总资金 / 2 × 杠杆</strong><em>${money(halfCapital)} × ${leverage.toFixed(1)} = ${money(projection.hedge_notional)}</em></div>
+          <div class="formula-line"><span>费差年化</span><strong>|BN 单期费率 × 24 / BN周期 × 365 - OKX 单期费率 × 24 / OKX周期 × 365|</strong><em>|${percent(item.binance_funding_rate, 4)} × 24 / ${hours(item.binance_funding_interval_hours)} × 365 - ${percent(item.okx_funding_rate, 4)} × 24 / ${hours(item.okx_funding_interval_hours)} × 365| = ${percent(item.annualized_current)}</em></div>
           <div class="formula-line"><span>资金费</span><strong>对冲名义 × 当前费差年化 × 持有天数 / 365</strong><em>${money(projection.hedge_notional)} × ${percent(item.annualized_current)} × ${Number(settings.holding_days || 0)} / 365 = ${money(projection.gross_funding)}</em></div>
           <div class="formula-line"><span>价差贡献</span><strong>对冲名义 × 入场价差 bps / 10000</strong><em>${money(projection.hedge_notional)} × ${Number(item.entry_basis_bps || 0).toFixed(1)} / 10000 = ${money(projection.entry_basis_pnl)}</em></div>
           <div class="formula-line"><span>单边费用</span><strong>Binance 手续费 + OKX 手续费 + 双腿滑点 + 额外预留</strong><em>${money(projection.binance_open_fee)} + ${money(projection.okx_open_fee)} + ${money(projection.slippage_open)} + ${money(projection.extra_open_fee)} = ${money(projection.opening_cost)}</em></div>
