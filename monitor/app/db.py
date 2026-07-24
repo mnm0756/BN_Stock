@@ -8,10 +8,12 @@ from typing import Any
 
 
 DEFAULT_SETTINGS: dict[str, Any] = {
+    "settings_version": 3,
     "provider_mode": "auto",
     "refresh_seconds": 15,
     "total_capital": 1000.0,
     "perp_allocation": 0.5,
+    "leverage": 1.0,
     "holding_days": 30,
     "min_annualized": 0.0,
     "execution_mode": "maker",
@@ -19,23 +21,42 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "spot_min_fee": 0.35,
     "perp_maker_fee": 0.0,
     "perp_taker_fee": 0.0004,
+    "binance_maker_fee": 0.0002,
+    "binance_taker_fee": 0.0005,
+    "okx_maker_fee": 0.0002,
+    "okx_taker_fee": 0.0005,
     "slippage_bps": 2.0,
     "extra_cost_bps": 0.0,
     "extra_fixed_fee": 0.0,
     "alert_annualized": 0.5,
     "watch_symbols": [
-        "MUUSDT",
-        "NOKUSDT",
-        "ASTSUSDT",
-        "NVOUSDT",
-        "MSTRUSDT",
-        "COINUSDT",
-        "NVDAUSDT",
-        "TSLAUSDT",
-        "AAPLUSDT",
-        "AMDUSDT",
-        "PLTRUSDT",
+        "BTCUSDT",
+        "ETHUSDT",
+        "SOLUSDT",
+        "XRPUSDT",
+        "DOGEUSDT",
+        "BNBUSDT",
+        "ADAUSDT",
+        "LINKUSDT",
+        "AVAXUSDT",
+        "SUIUSDT",
+        "LTCUSDT",
+        "BCHUSDT",
     ],
+}
+
+LEGACY_STOCK_SYMBOLS = {
+    "MUUSDT",
+    "NOKUSDT",
+    "ASTSUSDT",
+    "NVOUSDT",
+    "MSTRUSDT",
+    "COINUSDT",
+    "NVDAUSDT",
+    "TSLAUSDT",
+    "AAPLUSDT",
+    "AMDUSDT",
+    "PLTRUSDT",
 }
 
 
@@ -74,10 +95,14 @@ class Database:
         with self._lock, self._connect() as conn:
             row = conn.execute("SELECT payload FROM settings WHERE id = 1").fetchone()
         saved = json.loads(row["payload"]) if row else {}
-        return {**DEFAULT_SETTINGS, **saved}
+        merged = {**DEFAULT_SETTINGS, **saved}
+        watch_symbols = set(merged.get("watch_symbols") or [])
+        if (saved.get("settings_version", 1) < 3 and watch_symbols & LEGACY_STOCK_SYMBOLS):
+            merged["watch_symbols"] = DEFAULT_SETTINGS["watch_symbols"]
+        return merged
 
     def save_settings(self, settings: dict[str, Any]) -> dict[str, Any]:
-        merged = {**DEFAULT_SETTINGS, **settings}
+        merged = {**DEFAULT_SETTINGS, **settings, "settings_version": DEFAULT_SETTINGS["settings_version"]}
         with self._lock, self._connect() as conn:
             conn.execute(
                 "UPDATE settings SET payload = ? WHERE id = 1",

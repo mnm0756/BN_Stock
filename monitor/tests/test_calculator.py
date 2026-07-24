@@ -1,7 +1,9 @@
 from app.calculator import (
+    CrossExchangeInput,
     ProjectionInput,
     annualize_funding,
     calculate_position_pnl,
+    project_cross_exchange_profit,
     project_profit,
     spot_fee,
 )
@@ -89,6 +91,30 @@ def test_projection_includes_extra_cost_reserve() -> None:
     assert result.extra_close_fee == 0.3
     assert result.total_cost == 0.6
     assert result.net_profit == -0.6
+
+
+def test_cross_exchange_projection_counts_both_exchange_fees_and_slippage() -> None:
+    result = project_cross_exchange_profit(
+        CrossExchangeInput(
+            total_capital=1000,
+            leverage=2,
+            holding_days=30,
+            funding_spread_annualized=0.12,
+            binance_fee_rate=0.0002,
+            okx_fee_rate=0.0002,
+            slippage_bps=1,
+            extra_cost_bps=0,
+            extra_fixed_fee=0,
+            entry_basis_bps=0,
+        )
+    )
+    assert result.hedge_notional == 1000
+    assert round(result.gross_funding, 4) == 9.863
+    assert result.binance_open_fee == 0.2
+    assert result.okx_open_fee == 0.2
+    assert result.slippage_open == 0.2
+    assert round(result.total_cost, 4) == 1.2
+    assert round(result.net_profit, 4) == 8.663
 
 
 def test_position_pnl_combines_both_legs_and_funding() -> None:

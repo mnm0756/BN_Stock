@@ -16,8 +16,8 @@ class AppConfig(BaseSettings):
     monitor_provider_mode: str = "auto"
     monitor_refresh_seconds: int = 15
     binance_futures_base_url: str = "https://fapi.binance.com"
+    okx_base_url: str = "https://www.okx.com"
     database_path: Path = ROOT / "data" / "monitor.db"
 
 
 config = AppConfig()
-

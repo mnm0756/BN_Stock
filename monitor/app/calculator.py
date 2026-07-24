@@ -69,6 +69,86 @@ class Projection:
     account_annualized: float
 
 
+@dataclass(frozen=True)
+class CrossExchangeInput:
+    total_capital: float
+    leverage: float
+    holding_days: int
+    funding_spread_annualized: float
+    binance_fee_rate: float
+    okx_fee_rate: float
+    slippage_bps: float
+    extra_cost_bps: float
+    extra_fixed_fee: float
+    entry_basis_bps: float
+
+
+@dataclass(frozen=True)
+class CrossExchangeProjection:
+    hedge_notional: float
+    gross_funding: float
+    entry_basis_pnl: float
+    opening_cost: float
+    closing_cost: float
+    binance_open_fee: float
+    binance_close_fee: float
+    okx_open_fee: float
+    okx_close_fee: float
+    slippage_open: float
+    slippage_close: float
+    extra_open_fee: float
+    extra_close_fee: float
+    total_cost: float
+    cost_pct_of_hedge: float
+    cost_pct_of_capital: float
+    net_profit: float
+    return_pct: float
+    account_annualized: float
+
+
+def project_cross_exchange_profit(item: CrossExchangeInput) -> CrossExchangeProjection:
+    capital = max(item.total_capital, 0.0)
+    leverage = max(item.leverage, 0.0)
+    hedge_notional = capital * leverage / 2
+    gross_funding = hedge_notional * item.funding_spread_annualized * max(item.holding_days, 0) / 365
+    entry_basis_pnl = hedge_notional * item.entry_basis_bps / 10_000
+
+    binance_fee = hedge_notional * max(item.binance_fee_rate, 0.0)
+    okx_fee = hedge_notional * max(item.okx_fee_rate, 0.0)
+    one_way_slippage = hedge_notional * max(item.slippage_bps, 0.0) / 10_000 * 2
+    one_way_extra = (
+        hedge_notional * max(item.extra_cost_bps, 0.0) / 10_000
+        + max(item.extra_fixed_fee, 0.0)
+    )
+    opening_cost = binance_fee + okx_fee + one_way_slippage + one_way_extra
+    closing_cost = opening_cost
+    total_cost = opening_cost + closing_cost
+    net_profit = gross_funding + entry_basis_pnl - total_cost
+    return_pct = net_profit / capital if capital else 0.0
+    account_annualized = return_pct * 365 / item.holding_days if item.holding_days else 0.0
+    return CrossExchangeProjection(
+        hedge_notional=hedge_notional,
+        gross_funding=gross_funding,
+        entry_basis_pnl=entry_basis_pnl,
+        opening_cost=opening_cost,
+        closing_cost=closing_cost,
+        binance_open_fee=binance_fee,
+        binance_close_fee=binance_fee,
+        okx_open_fee=okx_fee,
+        okx_close_fee=okx_fee,
+        slippage_open=one_way_slippage,
+        slippage_close=one_way_slippage,
+        extra_open_fee=one_way_extra,
+        extra_close_fee=one_way_extra,
+        total_cost=total_cost,
+        cost_pct_of_hedge=total_cost / hedge_notional if hedge_notional else 0.0,
+        cost_pct_of_capital=total_cost / capital if capital else 0.0,
+        net_profit=net_profit,
+        return_pct=return_pct,
+        account_annualized=account_annualized,
+    )
+
+
 def project_profit(item: ProjectionInput) -> Projection:
     capital = max(item.total_capital, 0.0)
     allocation = min(max(item.perp_allocation, 0.0), 1.0)

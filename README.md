@@ -1,6 +1,6 @@
-# BN Stock Carry
+# BN OKX Funding Monitor
 
-Binance Stock Trading / TradFi Perps carry monitor with a local web dashboard.
+Binance / OKX USDT perpetual funding-spread monitor with a local web dashboard.
 
 The runnable app lives in `monitor/`.
 

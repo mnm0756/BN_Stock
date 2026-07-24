@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MONITOR_ROOT = ROOT / "monitor"
 sys.path.insert(0, str(MONITOR_ROOT))
 
-os.environ.setdefault("DATABASE_PATH", "/tmp/bn_stock_monitor.db")
+os.environ.setdefault("DATABASE_PATH", "/tmp/bn_okx_funding_monitor.db")
 
 from app.calculator import utc_now_iso  # noqa: E402
 from app.config import config  # noqa: E402
@@ -24,7 +24,7 @@ from app.service import MonitorService  # noqa: E402
 
 db = Database(config.database_path)
 service = MonitorService(db)
-app = FastAPI(title="BN Stock Carry Monitor API", version="1.0.0")
+app = FastAPI(title="BN OKX Funding Monitor API", version="2.0.0")
 
 
 async def current_snapshot() -> dict:

@@ -5,22 +5,20 @@ from datetime import datetime, timezone
 from typing import Any
 
 from .calculator import (
-    ProjectionInput,
-    annualize_average,
-    annualize_funding,
+    CrossExchangeInput,
     calculate_position_pnl,
-    project_profit,
+    project_cross_exchange_profit,
     utc_now_iso,
 )
 from .config import config
 from .db import Database
-from .providers import BinanceFuturesProvider, DemoProvider, ProviderError
+from .providers import BinanceOkxFundingProvider, DemoProvider, ProviderError
 
 
 class MonitorService:
     def __init__(self, db: Database) -> None:
         self.db = db
-        self.binance = BinanceFuturesProvider(config.binance_futures_base_url)
+        self.provider = BinanceOkxFundingProvider(config.binance_futures_base_url, config.okx_base_url)
         self.demo = DemoProvider()
         self.snapshot: dict[str, Any] = {
             "status": "starting",
@@ -47,7 +45,7 @@ class MonitorService:
                 if mode == "demo":
                     raw = await self.demo.fetch(symbols)
                 else:
-                    raw = await self.binance.fetch(symbols)
+                    raw = await self.provider.fetch(symbols)
             except ProviderError as exc:
                 error_text = str(exc) or exc.__class__.__name__
                 if mode == "live":
@@ -102,61 +100,55 @@ class MonitorService:
 
     def _build_opportunities(self, records: list[dict[str, Any]], settings: dict[str, Any]) -> list[dict[str, Any]]:
         result = []
-        fee_rate = (
-            settings["perp_maker_fee"]
+        binance_fee_rate = (
+            settings["binance_maker_fee"]
             if settings["execution_mode"] == "maker"
-            else settings["perp_taker_fee"]
+            else settings["binance_taker_fee"]
+        )
+        okx_fee_rate = (
+            settings["okx_maker_fee"]
+            if settings["execution_mode"] == "maker"
+            else settings["okx_taker_fee"]
         )
         for row in records:
-            spot_ask = row["index_price"]
-            spot_bid = row["index_price"]
-            if spot_ask <= 0 or row["perp_bid"] <= 0:
+            if row["long_ask"] <= 0 or row["short_bid"] <= 0:
                 continue
-            entry_basis_bps = (row["perp_bid"] / spot_ask - 1) * 10_000
-            exit_basis_bps = (row["perp_ask"] / spot_bid - 1) * 10_000
-            current_annualized = annualize_funding(
-                row["funding_rate"], row["funding_interval_hours"]
-            )
-            historical = annualize_average(
-                row["history_rates"], row["funding_interval_hours"]
-            )
-            projection = project_profit(
-                ProjectionInput(
+            current_annualized = row["funding_spread_annualized"]
+            projection = project_cross_exchange_profit(
+                CrossExchangeInput(
                     total_capital=settings["total_capital"],
-                    perp_allocation=settings["perp_allocation"],
+                    leverage=settings.get("leverage", 1.0),
                     holding_days=settings["holding_days"],
-                    funding_rate=row["funding_rate"],
-                    interval_hours=row["funding_interval_hours"],
-                    spot_fee_rate=settings["spot_fee_rate"],
-                    spot_min_fee=settings["spot_min_fee"],
-                    perp_fee_rate=fee_rate,
+                    funding_spread_annualized=current_annualized,
+                    binance_fee_rate=binance_fee_rate,
+                    okx_fee_rate=okx_fee_rate,
                     slippage_bps=settings["slippage_bps"],
                     extra_cost_bps=settings["extra_cost_bps"],
                     extra_fixed_fee=settings["extra_fixed_fee"],
-                    entry_basis_bps=entry_basis_bps,
+                    entry_basis_bps=row["entry_basis_bps"],
                 )
             )
             risk_flags = []
-            if row["funding_rate"] < 0:
-                risk_flags.append("负资金费")
-            elif abs(row["funding_rate"]) < 1e-12:
-                risk_flags.append("当前为0")
+            if current_annualized <= 0:
+                risk_flags.append("无费差")
+            elif current_annualized < settings["min_annualized"]:
+                risk_flags.append("费差偏低")
             if current_annualized > 2:
                 risk_flags.append("费率过热")
-            if abs(entry_basis_bps) > 100:
+            if abs(row["entry_basis_bps"]) > 30:
                 risk_flags.append("价差偏大")
             if not risk_flags:
                 risk_flags.append("常规")
             result.append(
                 {
                     **row,
-                    "spot_bid": spot_bid,
-                    "spot_ask": spot_ask,
-                    "spot_price_kind": "index_reference",
-                    "entry_basis_bps": entry_basis_bps,
-                    "exit_basis_bps": exit_basis_bps,
+                    "spot_bid": row["long_bid"],
+                    "spot_ask": row["long_ask"],
+                    "perp_bid": row["short_bid"],
+                    "perp_ask": row["short_ask"],
+                    "spot_price_kind": "cross_exchange",
+                    "exit_basis_bps": row["entry_basis_bps"],
                     "annualized_current": current_annualized,
-                    "annualized_7d": historical,
                     "projection": projection.__dict__,
                     "risk_flags": risk_flags,
                 }
@@ -174,9 +166,9 @@ class MonitorService:
     def _build_positions(self, opportunities: list[dict[str, Any]], settings: dict[str, Any]) -> list[dict[str, Any]]:
         market = {item["symbol"]: item for item in opportunities}
         fee_rate = (
-            settings["perp_maker_fee"]
+            settings["binance_maker_fee"] + settings["okx_maker_fee"]
             if settings["execution_mode"] == "maker"
-            else settings["perp_taker_fee"]
+            else settings["binance_taker_fee"] + settings["okx_taker_fee"]
         )
         result = []
         for position in self.db.list_positions():
@@ -193,9 +185,9 @@ class MonitorService:
                 perp_ask=quote["perp_ask"],
                 funding_received=position.get("funding_received", 0),
                 opening_fees=position.get("opening_fees", 0),
-                spot_fee_rate=settings["spot_fee_rate"],
-                spot_min_fee=settings["spot_min_fee"],
-                perp_fee_rate=fee_rate,
+                spot_fee_rate=fee_rate,
+                spot_min_fee=0,
+                perp_fee_rate=0,
             )
             result.append(
                 {
@@ -203,7 +195,7 @@ class MonitorService:
                     "quote_available": True,
                     "current_spot": spot_bid,
                     "current_perp": quote["perp_ask"],
-                    "spot_price_kind": "manual" if position.get("spot_price_override") else "index_reference",
+                    "spot_price_kind": "manual" if position.get("spot_price_override") else "cross_exchange",
                     "pnl": pnl.__dict__,
                 }
             )

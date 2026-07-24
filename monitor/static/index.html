@@ -4,9 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light" />
-    <title>BN Stock Carry</title>
+    <title>BN OKX Funding Carry</title>
     <link rel="preconnect" href="https://cdn.jsdelivr.net" />
-    <link rel="stylesheet" href="/static/styles.css?v=1.0.11" />
+    <link rel="stylesheet" href="/static/styles.css?v=2.0.0" />
   </head>
   <body>
     <div class="app-shell">
@@ -14,8 +14,8 @@
         <div class="brand-block">
           <div class="brand-mark" aria-hidden="true">BN</div>
           <div>
-            <h1>BN Stock Carry</h1>
-            <p>美股现货 × TradFi 合约</p>
+            <h1>BN OKX Funding</h1>
+            <p>Binance × OKX 永续资金费差</p>
           </div>
         </div>
 
@@ -120,13 +120,13 @@
 
               <div class="field-group">
                 <div class="field-line">
-                  <label for="allocation-input">合约保证金占比</label>
-                  <output id="allocation-output">50%</output>
+                  <label for="allocation-input">测算杠杆</label>
+                  <output id="allocation-output">1x</output>
                 </div>
-                <input id="allocation-input" type="range" min="10" max="90" value="50" step="5" />
+                <input id="allocation-input" type="range" min="1" max="10" value="1" step="0.5" />
                 <div class="allocation-rail" aria-hidden="true">
-                  <span id="spot-allocation-label">现货 50%</span>
-                  <span id="perp-allocation-label">合约 50%</span>
+                  <span id="spot-allocation-label">两所各放一半保证金</span>
+                  <span id="perp-allocation-label">名义 = 保证金 × 杠杆</span>
                 </div>
               </div>
 
@@ -146,7 +146,7 @@
 
               <div class="source-note">
                 <i data-lucide="info"></i>
-                <p>现货列使用 Binance 合约指数参考价。持仓可手工覆盖为真实现货价。</p>
+                <p>同一 USDT 永续在 Binance 和 OKX 之间对冲，做空资金费更高的一边，做多更低的一边。</p>
               </div>
             </aside>
 
@@ -169,10 +169,10 @@
                   <thead>
                     <tr>
                       <th>标的</th>
-                      <th>当前资金费</th>
-                      <th>近7日历史</th>
-                      <th>入场价差</th>
-                      <th>参考现货 / 合约卖价</th>
+                      <th>资金费差</th>
+                      <th>Binance / OKX</th>
+                      <th>方向</th>
+                      <th>入场盘口</th>
                       <th>预估费用</th>
                       <th>预估净收益</th>
                       <th>风险</th>
@@ -194,7 +194,7 @@
               <div class="empty-detail">
                 <i data-lucide="mouse-pointer-2"></i>
                 <strong>选择一条机会</strong>
-                <span>查看资金费、价差和费用拆解</span>
+                <span>查看两边资金费、方向和费用拆解</span>
               </div>
             </aside>
           </div>
@@ -245,19 +245,19 @@
             <input id="refresh-seconds-input" type="number" min="5" max="300" />
           </label>
           <label>
-            <span>美股价差费率</span>
+            <span>Binance 挂单费率</span>
             <input id="spot-fee-input" type="number" min="0" max="0.1" step="0.0001" />
           </label>
           <label>
-            <span>美股最低平台费</span>
-            <input id="spot-min-fee-input" type="number" min="0" step="0.01" />
+            <span>Binance 吃单费率</span>
+            <input id="spot-min-fee-input" type="number" min="0" step="0.0001" />
           </label>
           <label>
-            <span>合约挂单费率</span>
+            <span>OKX 挂单费率</span>
             <input id="maker-fee-input" type="number" min="-0.01" max="0.1" step="0.0001" />
           </label>
           <label>
-            <span>合约吃单费率</span>
+            <span>OKX 吃单费率</span>
             <input id="taker-fee-input" type="number" min="0" max="0.1" step="0.0001" />
           </label>
           <label>
@@ -295,7 +295,7 @@
         <input id="position-id-input" type="hidden" />
         <div class="modal-header">
           <div>
-            <span class="eyebrow">现货多头 + 合约空头</span>
+            <span class="eyebrow">低费率做多 + 高费率做空</span>
             <h2 id="position-dialog-title">登记持仓</h2>
           </div>
           <button type="button" class="icon-button close-dialog" title="关闭" aria-label="关闭">
@@ -305,18 +305,18 @@
         <div class="modal-body position-layout">
           <label>
             <span>合约代码</span>
-            <input id="position-symbol-input" type="text" required placeholder="MUUSDT" />
+            <input id="position-symbol-input" type="text" required placeholder="BTCUSDT" />
           </label>
           <label>
-            <span>股票数量</span>
+            <span>币数量</span>
             <input id="position-quantity-input" type="number" min="0.000001" step="any" required />
           </label>
           <label>
-            <span>现货买入价</span>
+            <span>多头入场价</span>
             <input id="position-spot-entry-input" type="number" min="0.000001" step="any" required />
           </label>
           <label>
-            <span>合约做空价</span>
+            <span>空头入场价</span>
             <input id="position-perp-entry-input" type="number" min="0.000001" step="any" required />
           </label>
           <label>
@@ -332,8 +332,8 @@
             <input id="position-fees-input" type="number" min="0" step="any" value="0" />
           </label>
           <label>
-            <span>真实现货价（可空）</span>
-            <input id="position-spot-override-input" type="number" min="0.000001" step="any" placeholder="空值使用指数参考价" />
+            <span>当前多头价覆盖（可空）</span>
+            <input id="position-spot-override-input" type="number" min="0.000001" step="any" placeholder="空值使用实时多头盘口" />
           </label>
           <label class="wide-field">
             <span>备注</span>
@@ -352,6 +352,6 @@
     <div id="toast-region" class="toast-region" aria-live="polite"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
-    <script src="/static/app.js?v=1.0.11" defer></script>
+    <script src="/static/app.js?v=2.0.0" defer></script>
   </body>
 </html>

@@ -34,54 +34,48 @@ const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (char) => 
 
 const FEE_SOURCES = [
   {
-    title: "美股 Stock Trading",
+    title: "Binance USD-M 永续",
     status: "已计入",
-    detail: "0佣金；<= $350 每单 $0.35；> $350 按 0.1% spread，向上取到 2 位小数。",
-    href: "https://www.binance.com/en/support/faq/detail/a7469c7703524024b5bc2d492b03639d",
+    detail: "默认按普通用户 USDT 永续 Maker 0.0200%、Taker 0.0500%，可在设置中改为你的账户费率。",
+    href: "https://www.binance.com/en/fee/futureFee",
   },
   {
-    title: "TradFi Perps 交易费",
+    title: "OKX USDT 永续",
     status: "已计入",
-    detail: "Regular/VIP1 默认 Maker 0%，Taker 0.0400%；BNB 抵扣 Taker 为 0.0360%。",
-    href: "https://www.binance.com/en/support/announcement/detail/a4c3f1957f2b4e69902985154235c3b1",
+    detail: "默认按普通用户永续 Maker 0.0200%、Taker 0.0500%，可在设置中改为你的账户费率。",
+    href: "https://www.okx.com/fees",
   },
   {
-    title: "bStocks 转换",
-    status: "未默认计入",
-    detail: "股票与 bStocks 1:1 转换无费用；bStocks 提现有 BSC 网络费。",
-    href: "https://www.binance.com/en/support/faq/detail/f0d41139fadc4790bf9a4c0c7bce2e88",
+    title: "资金费数据",
+    status: "实时读取",
+    detail: "Binance 使用 premiumIndex/fundingRate；OKX 使用 funding-rate/funding-rate-history。",
+    href: "https://developers.binance.com/en/docs/catalog/core-trading-derivatives-trading-usd-s-m-futures/api/rest-api/market-data",
   },
   {
-    title: "bStocks 现货交易",
-    status: "未默认计入",
-    detail: "新上市 bStocks 对在活动期享 0 Maker；Taker/点差需按实际成交和账户费率核对。",
-    href: "https://www.binance.com/en/support/announcement/detail/ea42cf41150f4e9ab7f1631fa21bba1e",
-  },
-  {
-    title: "ADR/税费/换汇等",
+    title: "划转/资金占用",
     status: "需手动预留",
-    detail: "ADR 通常 $0.01-$0.05/股、每年一到两次；税费、换汇、监管、分红相关费用可能另算。",
-    href: "https://www.binance.com/en/support/faq/detail/a7469c7703524024b5bc2d492b03639d",
+    detail: "跨所转账、借币、资金闲置、强平缓冲和账户等级差异不会自动读取，请用额外成本预留。",
+    href: "https://www.okx.com/help/fee-details",
   },
 ];
 
-function binanceStockUrl(item) {
-  return `https://www.binance.com/en/stocks/EQ_${encodeURIComponent(item.ticker)}`;
-}
-
 function binanceFuturesUrl(item) {
   return `https://www.binance.com/en/futures/${encodeURIComponent(item.symbol)}`;
+}
+
+function okxSwapUrl(item) {
+  return `https://www.okx.com/trade-swap/${encodeURIComponent((item.okx_inst_id || `${item.ticker}-USDT-SWAP`).toLowerCase())}`;
 }
 
 function marketLinks(item, tone = "compact") {
   const labelClass = tone === "full" ? " full" : "";
   return `
     <div class="market-links${labelClass}">
-      <a class="market-link stock" href="${binanceStockUrl(item)}" target="_blank" rel="noreferrer" title="打开 Binance 美股现货 ${escapeHtml(item.ticker)}">
-        <i data-lucide="external-link"></i><span>现货</span>
-      </a>
       <a class="market-link futures" href="${binanceFuturesUrl(item)}" target="_blank" rel="noreferrer" title="打开 Binance 合约 ${escapeHtml(item.symbol)}">
-        <i data-lucide="external-link"></i><span>合约</span>
+        <i data-lucide="external-link"></i><span>Binance</span>
+      </a>
+      <a class="market-link stock" href="${okxSwapUrl(item)}" target="_blank" rel="noreferrer" title="打开 OKX 合约 ${escapeHtml(item.okx_inst_id || item.symbol)}">
+        <i data-lucide="external-link"></i><span>OKX</span>
       </a>
     </div>
   `;
@@ -127,10 +121,10 @@ function formatLocalTime(value, withSeconds = true) {
 function summarizeSourceError(error) {
   const message = String(error || "");
   if (message.includes("451") || message.toLowerCase().includes("restricted location")) {
-    return "Binance 公共接口返回 451，当前网络或地区不可用";
+    return "交易所公共接口返回 451，当前网络或地区不可用";
   }
   if (message.toLowerCase().includes("timeout")) {
-    return "连接 Binance 公共接口超时";
+    return "连接交易所公共接口超时";
   }
   const firstLine = message.split("\n")[0].trim();
   return firstLine.length > 150 ? `${firstLine.slice(0, 147)}...` : firstLine;
@@ -162,7 +156,7 @@ function renderStatus() {
   if (source === "demo" || source === "error" || source === "stale") {
     banner.classList.remove("hidden");
     if (source === "stale") {
-      $("#data-banner-text").textContent = `实时刷新暂时失败，当前保留上一份真实行情，请核对 Binance 页面后再交易。原因：${summarizeSourceError(error) || "未知错误"}`;
+      $("#data-banner-text").textContent = `实时刷新暂时失败，当前保留上一份真实行情，请核对 Binance 和 OKX 页面后再交易。原因：${summarizeSourceError(error) || "未知错误"}`;
     } else if (source === "demo") {
       $("#data-banner-text").textContent = `当前显示演示数据，不可用于交易判断。${error ? `实时接口原因：${summarizeSourceError(error)}` : "已手动启用演示模式。"}`;
     } else {
@@ -230,20 +224,26 @@ function projectionCost(projection) {
 
 function costBreakdown(projection) {
   const total = projectionCost(projection);
+  const hasCrossDetail = projection && Object.hasOwn(projection, "binance_open_fee");
   const hasDetail = projection && Object.hasOwn(projection, "spot_open_fee");
-  const spot = hasDetail ? Number(projection.spot_open_fee || 0) + Number(projection.spot_close_fee || 0) : 0;
-  const perp = hasDetail ? Number(projection.perp_open_fee || 0) + Number(projection.perp_close_fee || 0) : 0;
-  const slippage = hasDetail ? Number(projection.slippage_open || 0) + Number(projection.slippage_close || 0) : 0;
-  const extra = hasDetail ? Number(projection.extra_open_fee || 0) + Number(projection.extra_close_fee || 0) : 0;
+  const binance = hasCrossDetail ? Number(projection.binance_open_fee || 0) + Number(projection.binance_close_fee || 0) : 0;
+  const okx = hasCrossDetail ? Number(projection.okx_open_fee || 0) + Number(projection.okx_close_fee || 0) : 0;
+  const spot = hasCrossDetail ? binance : hasDetail ? Number(projection.spot_open_fee || 0) + Number(projection.spot_close_fee || 0) : 0;
+  const perp = hasCrossDetail ? okx : hasDetail ? Number(projection.perp_open_fee || 0) + Number(projection.perp_close_fee || 0) : 0;
+  const detail = hasCrossDetail || hasDetail;
+  const slippage = detail ? Number(projection.slippage_open || 0) + Number(projection.slippage_close || 0) : 0;
+  const extra = detail ? Number(projection.extra_open_fee || 0) + Number(projection.extra_close_fee || 0) : 0;
   return {
     total,
+    binance,
+    okx,
     spot,
     perp,
     slippage,
     extra,
     costPctOfHedge: Number(projection?.cost_pct_of_hedge || 0),
     costPctOfCapital: Number(projection?.cost_pct_of_capital || 0),
-    hasDetail,
+    hasDetail: detail,
   };
 }
 
@@ -281,11 +281,11 @@ function renderOpportunities() {
           <span><strong>${escapeHtml(item.ticker)}</strong><small>${escapeHtml(item.name)}</small>${marketLinks(item)}</span>
         </div>
       </td>
-      <td><div class="value-stack"><strong class="${valueClass(item.funding_rate)}">${percent(item.funding_rate, 4)}</strong><small>每 ${item.funding_interval_hours} 小时</small></div></td>
-      <td><div class="value-stack"><strong class="${valueClass(item.annualized_7d)}">${percent(item.annualized_7d)}</strong><small>不参与收益估算</small></div></td>
-      <td><strong class="${valueClass(item.entry_basis_bps)}">${bps(item.entry_basis_bps)}</strong></td>
-      <td><div class="value-stack"><strong>${price(item.spot_ask)} / ${price(item.perp_bid)}</strong><small>指数参考 / 合约 Bid</small></div></td>
-      <td><div class="value-stack"><strong class="negative">-${money(costs.total)}</strong><small>股 ${money(costs.spot)} / 合 ${money(costs.perp)} / 滑 ${money(costs.slippage)}</small><small>其 ${money(costs.extra)} / ${percent(costs.costPctOfHedge)} 名义</small></div></td>
+      <td><div class="value-stack"><strong class="${valueClass(item.funding_rate)}">${percent(item.funding_rate, 4)}</strong><small>当前年化 ${percent(item.annualized_current)}</small></div></td>
+      <td><div class="value-stack"><strong>${percent(item.binance_funding_rate, 4)} / ${percent(item.okx_funding_rate, 4)}</strong><small>近7日差 ${percent(item.annualized_7d)}</small></div></td>
+      <td><div class="value-stack"><strong>${escapeHtml(item.short_exchange)} 空 / ${escapeHtml(item.long_exchange)} 多</strong><small>收 ${percent(item.short_rate, 4)}，付 ${percent(item.long_rate, 4)}</small></div></td>
+      <td><div class="value-stack"><strong>${price(item.short_bid)} / ${price(item.long_ask)}</strong><small>空方 Bid / 多方 Ask，${bps(item.entry_basis_bps)}</small></div></td>
+      <td><div class="value-stack"><strong class="negative">-${money(costs.total)}</strong><small>BN ${money(costs.binance)} / OKX ${money(costs.okx)} / 滑 ${money(costs.slippage)}</small><small>其 ${money(costs.extra)} / ${percent(costs.costPctOfHedge)} 名义</small></div></td>
       <td><div class="value-stack"><strong class="${valueClass(item.projection.net_profit)}">${money(item.projection.net_profit)}</strong><small>${percent(item.projection.return_pct)} / 持有期</small></div></td>
       <td>${riskTag(item)}</td>
     </tr>
@@ -309,13 +309,10 @@ function renderDetail() {
   const projection = item.projection;
   const costs = costBreakdown(projection);
   const settings = state.snapshot?.settings || {};
-  const perpFeeRate = settings.execution_mode === "maker" ? settings.perp_maker_fee : settings.perp_taker_fee;
-  const spotBudget = Number(settings.total_capital || 0) * (1 - Number(settings.perp_allocation || 0));
-  const perpBudget = Number(settings.total_capital || 0) * Number(settings.perp_allocation || 0);
-  const fundingEvents = Number(settings.holding_days || 0) * 24 / Math.max(Number(item.funding_interval_hours || 0), 0.001);
-  const fundingRateUsed = projection.hedge_notional && fundingEvents
-    ? Number(projection.gross_funding || 0) / Number(projection.hedge_notional) / fundingEvents
-    : 0;
+  const binanceFeeRate = settings.execution_mode === "maker" ? settings.binance_maker_fee : settings.binance_taker_fee;
+  const okxFeeRate = settings.execution_mode === "maker" ? settings.okx_maker_fee : settings.okx_taker_fee;
+  const halfCapital = Number(settings.total_capital || 0) / 2;
+  const leverage = Number(settings.leverage || 1);
   const maxRate = Math.max(...item.history_rates.map((value) => Math.abs(value)), 0.000001);
   const bars = item.history_rates.map((value) => {
     const height = Math.max(3, Math.abs(value) / maxRate * 52);
@@ -329,31 +326,33 @@ function renderDetail() {
           <div><h2>${escapeHtml(item.ticker)}</h2><span class="eyebrow">${escapeHtml(item.name)}</span></div>
         </div>
         <div class="detail-title-actions">
-          <span class="source-chip">指数参考现货</span>
+          <span class="source-chip">跨所永续</span>
           ${marketLinks(item, "full")}
         </div>
       </div>
       <div class="detail-block">
-        <div class="detail-block-title">资金费</div>
+        <div class="detail-block-title">资金费差</div>
         <div class="detail-rate">
-          <div><span>当前年化</span><strong class="${valueClass(item.annualized_current)}">${percent(item.annualized_current)}</strong></div>
-          <div><span>近7日历史年化</span><strong class="${valueClass(item.annualized_7d)}">${percent(item.annualized_7d)}</strong></div>
+          <div><span>当前费差年化</span><strong class="${valueClass(item.annualized_current)}">${percent(item.annualized_current)}</strong></div>
+          <div><span>近7日费差年化</span><strong class="${valueClass(item.annualized_7d)}">${percent(item.annualized_7d)}</strong></div>
         </div>
-        <div class="history-bars" aria-label="最近21次资金费">${bars}</div>
+        <div class="metric-row"><span>Binance 当前资金费</span><strong class="${valueClass(item.binance_funding_rate)}">${percent(item.binance_funding_rate, 4)}</strong></div>
+        <div class="metric-row"><span>OKX 当前资金费</span><strong class="${valueClass(item.okx_funding_rate)}">${percent(item.okx_funding_rate, 4)}</strong></div>
+        <div class="history-bars" aria-label="最近21次跨所资金费差">${bars}</div>
       </div>
       <div class="detail-block">
         <div class="detail-block-title">两条腿</div>
-        <div class="leg-row"><span class="leg-side long">买入</span><span>现货参考 Ask</span><strong>${price(item.spot_ask)}</strong></div>
-        <div class="leg-row"><span class="leg-side short">做空</span><span>合约 Bid</span><strong>${price(item.perp_bid)}</strong></div>
+        <div class="leg-row"><span class="leg-side long">做多</span><span>${escapeHtml(item.long_exchange)} Ask</span><strong>${price(item.long_ask)}</strong></div>
+        <div class="leg-row"><span class="leg-side short">做空</span><span>${escapeHtml(item.short_exchange)} Bid</span><strong>${price(item.short_bid)}</strong></div>
         <div class="metric-row"><span>可对冲名义本金</span><strong>${money(projection.hedge_notional)}</strong></div>
         <div class="metric-row"><span>入场价差</span><strong class="${valueClass(item.entry_basis_bps)}">${bps(item.entry_basis_bps)}</strong></div>
       </div>
       <div class="detail-block">
         <div class="detail-block-title">持有期收益拆解</div>
-        <div class="metric-row"><span>按当前费率预估资金费</span><strong>${money(projection.gross_funding)}</strong></div>
+        <div class="metric-row"><span>按当前费差预估资金费</span><strong>${money(projection.gross_funding)}</strong></div>
         <div class="metric-row"><span>入场价差贡献</span><strong class="${valueClass(projection.entry_basis_pnl)}">${money(projection.entry_basis_pnl)}</strong></div>
-        <div class="metric-row"><span>美股平台费/价差 买+卖</span><strong class="negative">-${money(costs.spot)}</strong></div>
-        <div class="metric-row"><span>合约手续费 开+平</span><strong class="negative">-${money(costs.perp)}</strong></div>
+        <div class="metric-row"><span>Binance 手续费 开+平</span><strong class="negative">-${money(costs.binance)}</strong></div>
+        <div class="metric-row"><span>OKX 手续费 开+平</span><strong class="negative">-${money(costs.okx)}</strong></div>
         <div class="metric-row"><span>滑点预估 开+平</span><strong class="negative">-${money(costs.slippage)}</strong></div>
         <div class="metric-row"><span>额外预留成本 开+平</span><strong class="negative">-${money(costs.extra)}</strong></div>
         <div class="metric-row"><span>合计交易成本</span><strong class="negative">-${money(costs.total)}</strong></div>
@@ -363,18 +362,18 @@ function renderDetail() {
       </div>
       <div class="detail-block">
         <div class="detail-block-title">费用参数</div>
-        <div class="metric-row"><span>美股价差费率 / 最低平台费</span><strong>${percent(settings.spot_fee_rate, 3)} / ${money(settings.spot_min_fee)}</strong></div>
-        <div class="metric-row"><span>${settings.execution_mode === "maker" ? "合约挂单费率" : "合约吃单费率"}</span><strong>${percent(perpFeeRate, 4)}</strong></div>
+        <div class="metric-row"><span>${settings.execution_mode === "maker" ? "Binance 挂单费率" : "Binance 吃单费率"}</span><strong>${percent(binanceFeeRate, 4)}</strong></div>
+        <div class="metric-row"><span>${settings.execution_mode === "maker" ? "OKX 挂单费率" : "OKX 吃单费率"}</span><strong>${percent(okxFeeRate, 4)}</strong></div>
         <div class="metric-row"><span>单边滑点</span><strong>${Number(settings.slippage_bps || 0).toFixed(1)} bps</strong></div>
         <div class="metric-row"><span>额外单边成本</span><strong>${Number(settings.extra_cost_bps || 0).toFixed(1)} bps + ${money(settings.extra_fixed_fee)}</strong></div>
       </div>
       <div class="detail-block">
         <div class="detail-block-title">测算公式</div>
         <div class="formula-stack">
-          <div class="formula-line"><span>对冲名义</span><strong>min(总资金 × 合约占比, 总资金 × 现货占比)</strong><em>min(${money(perpBudget)}, ${money(spotBudget)}) = ${money(projection.hedge_notional)}</em></div>
-          <div class="formula-line"><span>资金费</span><strong>对冲名义 × 当前资金费率 × 结算次数</strong><em>${money(projection.hedge_notional)} × ${percent(fundingRateUsed, 4)} × ${fundingEvents.toFixed(1)} = ${money(projection.gross_funding)}</em></div>
+          <div class="formula-line"><span>对冲名义</span><strong>总资金 / 2 × 杠杆</strong><em>${money(halfCapital)} × ${leverage.toFixed(1)} = ${money(projection.hedge_notional)}</em></div>
+          <div class="formula-line"><span>资金费</span><strong>对冲名义 × 当前费差年化 × 持有天数 / 365</strong><em>${money(projection.hedge_notional)} × ${percent(item.annualized_current)} × ${Number(settings.holding_days || 0)} / 365 = ${money(projection.gross_funding)}</em></div>
           <div class="formula-line"><span>价差贡献</span><strong>对冲名义 × 入场价差 bps / 10000</strong><em>${money(projection.hedge_notional)} × ${Number(item.entry_basis_bps || 0).toFixed(1)} / 10000 = ${money(projection.entry_basis_pnl)}</em></div>
-          <div class="formula-line"><span>单边费用</span><strong>美股平台费/价差 + 合约费 + 滑点 + 额外预留</strong><em>${money(projection.spot_open_fee)} + ${money(projection.perp_open_fee)} + ${money(projection.slippage_open)} + ${money(projection.extra_open_fee)} = ${money(projection.opening_cost)}</em></div>
+          <div class="formula-line"><span>单边费用</span><strong>Binance 手续费 + OKX 手续费 + 双腿滑点 + 额外预留</strong><em>${money(projection.binance_open_fee)} + ${money(projection.okx_open_fee)} + ${money(projection.slippage_open)} + ${money(projection.extra_open_fee)} = ${money(projection.opening_cost)}</em></div>
           <div class="formula-line"><span>总费用</span><strong>2 × 单边费用</strong><em>2 × ${money(projection.opening_cost)} = ${money(costs.total)}</em></div>
           <div class="formula-line total"><span>净收益</span><strong>资金费 + 价差贡献 - 总费用</strong><em>${money(projection.gross_funding)} ${signedMoney(projection.entry_basis_pnl)} - ${money(costs.total)} = ${money(projection.net_profit)}</em></div>
         </div>
@@ -384,8 +383,8 @@ function renderDetail() {
         <div class="fee-audit-list">${renderFeeAudit()}</div>
       </div>
       <div class="detail-block">
-        <div class="risk-row"><i data-lucide="triangle-alert"></i><span>指数价不等于 Binance 美股现货可成交价，开仓前需核对真实盘口。</span></div>
-        <div class="risk-row"><i data-lucide="shield-alert"></i><span>现货不能自动补充合约保证金，股票急涨时空单仍可能先被强平。</span></div>
+        <div class="risk-row"><i data-lucide="triangle-alert"></i><span>跨所价格和资金费会快速变化，开仓前需同时核对两边盘口和资金费倒计时。</span></div>
+        <div class="risk-row"><i data-lucide="shield-alert"></i><span>两边账户保证金不能互相补充，单边急涨急跌时仍可能先触发强平。</span></div>
       </div>
     </div>`;
   $("[data-add-symbol]").addEventListener("click", () => openPositionDialog(item.symbol));
@@ -405,16 +404,16 @@ function renderPositions() {
     const pnl = position.pnl;
     return `<article class="position-card">
       <div class="position-card-head">
-        <div class="position-card-head-main"><span class="ticker-mark">${escapeHtml(position.symbol.replace("USDT", "").slice(0, 4))}</span><div><strong>${escapeHtml(position.symbol.replace("USDT", ""))}</strong><span class="eyebrow">${position.quantity} 股</span></div></div>
+        <div class="position-card-head-main"><span class="ticker-mark">${escapeHtml(position.symbol.replace("USDT", "").slice(0, 4))}</span><div><strong>${escapeHtml(position.symbol.replace("USDT", ""))}</strong><span class="eyebrow">${position.quantity} 币</span></div></div>
         ${positionActions(position.id)}
       </div>
       <div class="position-metrics">
-        <div class="position-metric"><span>现货盈亏</span><strong class="${valueClass(pnl.spot_pnl)}">${money(pnl.spot_pnl)}</strong></div>
+        <div class="position-metric"><span>多头盈亏</span><strong class="${valueClass(pnl.spot_pnl)}">${money(pnl.spot_pnl)}</strong></div>
         <div class="position-metric"><span>空单盈亏</span><strong class="${valueClass(pnl.perp_pnl)}">${money(pnl.perp_pnl)}</strong></div>
         <div class="position-metric"><span>已收资金费</span><strong class="${valueClass(pnl.funding)}">${money(pnl.funding)}</strong></div>
         <div class="position-metric"><span>费用 + 平仓成本</span><strong class="negative">-${money(pnl.fees + pnl.exit_cost).replace("-", "")}</strong></div>
-        <div class="position-metric"><span>现货 ${price(position.spot_entry)} → ${price(position.current_spot)}</span><strong>${position.spot_price_kind === "manual" ? "手工现货价" : "指数参考价"}</strong></div>
-        <div class="position-metric"><span>合约 ${price(position.perp_entry)} → ${price(position.current_perp)}</span><strong>合约 Ask</strong></div>
+        <div class="position-metric"><span>多头 ${price(position.spot_entry)} → ${price(position.current_spot)}</span><strong>${position.spot_price_kind === "manual" ? "手工覆盖" : "多头 Bid"}</strong></div>
+        <div class="position-metric"><span>空头 ${price(position.perp_entry)} → ${price(position.current_perp)}</span><strong>空头 Ask</strong></div>
       </div>
       <div class="position-total"><span>立即平仓预估净利润</span><strong class="${valueClass(pnl.net_pnl)}">${money(pnl.net_pnl)}</strong></div>
       <span class="price-source">${escapeHtml(position.note || `开仓于 ${formatLocalTime(position.opened_at, false)}`)}</span>
@@ -441,22 +440,22 @@ function syncControlsFromSettings(settings) {
   };
   setUnlessActive("#capital-input", settings.total_capital);
   setUnlessActive("#holding-days-input", settings.holding_days);
-  setUnlessActive("#allocation-input", Math.round(settings.perp_allocation * 100));
+  setUnlessActive("#allocation-input", settings.leverage || 1);
   const minAnnualizedInput = $("#min-annualized");
   const minAnnualizedPercent = Math.round(settings.min_annualized * 100);
   setUnlessActive("#min-annualized", minAnnualizedPercent);
   if (active !== minAnnualizedInput) {
     $("#min-annualized-output").textContent = `${minAnnualizedPercent}%`;
   }
-  updateAllocationLabels(settings.perp_allocation * 100);
+  updateAllocationLabels(settings.leverage || 1);
   $$('[data-execution]').forEach((button) => button.classList.toggle("active", button.dataset.execution === settings.execution_mode));
 }
 
-function updateAllocationLabels(perpPercent) {
-  const perp = Number(perpPercent);
-  $("#allocation-output").textContent = `${perp}%`;
-  $("#spot-allocation-label").textContent = `现货 ${100 - perp}%`;
-  $("#perp-allocation-label").textContent = `合约 ${perp}%`;
+function updateAllocationLabels(leverageValue) {
+  const leverage = Number(leverageValue || 1);
+  $("#allocation-output").textContent = `${leverage.toFixed(leverage % 1 ? 1 : 0)}x`;
+  $("#spot-allocation-label").textContent = "两所各放一半保证金";
+  $("#perp-allocation-label").textContent = `名义约 ${leverage.toFixed(leverage % 1 ? 1 : 0)} 倍`;
 }
 
 function collectSettings() {
@@ -465,7 +464,7 @@ function collectSettings() {
     ...current,
     total_capital: Number($("#capital-input").value),
     holding_days: Number($("#holding-days-input").value),
-    perp_allocation: Number($("#allocation-input").value) / 100,
+    leverage: Number($("#allocation-input").value),
     min_annualized: Number($("#min-annualized").value) / 100,
     execution_mode: $(".segment.active").dataset.execution,
   };
@@ -489,10 +488,10 @@ function openSettingsDialog() {
   const settings = state.snapshot.settings;
   $("#provider-mode-input").value = settings.provider_mode;
   $("#refresh-seconds-input").value = settings.refresh_seconds;
-  $("#spot-fee-input").value = settings.spot_fee_rate;
-  $("#spot-min-fee-input").value = settings.spot_min_fee;
-  $("#maker-fee-input").value = settings.perp_maker_fee;
-  $("#taker-fee-input").value = settings.perp_taker_fee;
+  $("#spot-fee-input").value = settings.binance_maker_fee;
+  $("#spot-min-fee-input").value = settings.binance_taker_fee;
+  $("#maker-fee-input").value = settings.okx_maker_fee;
+  $("#taker-fee-input").value = settings.okx_taker_fee;
   $("#slippage-input").value = settings.slippage_bps;
   $("#extra-cost-bps-input").value = settings.extra_cost_bps;
   $("#extra-fixed-fee-input").value = settings.extra_fixed_fee;
@@ -507,10 +506,10 @@ async function saveSettingsDialog(event) {
     ...collectSettings(),
     provider_mode: $("#provider-mode-input").value,
     refresh_seconds: Number($("#refresh-seconds-input").value),
-    spot_fee_rate: Number($("#spot-fee-input").value),
-    spot_min_fee: Number($("#spot-min-fee-input").value),
-    perp_maker_fee: Number($("#maker-fee-input").value),
-    perp_taker_fee: Number($("#taker-fee-input").value),
+    binance_maker_fee: Number($("#spot-fee-input").value),
+    binance_taker_fee: Number($("#spot-min-fee-input").value),
+    okx_maker_fee: Number($("#maker-fee-input").value),
+    okx_taker_fee: Number($("#taker-fee-input").value),
     slippage_bps: Number($("#slippage-input").value),
     extra_cost_bps: Number($("#extra-cost-bps-input").value),
     extra_fixed_fee: Number($("#extra-fixed-fee-input").value),
@@ -625,7 +624,7 @@ function maybeNotify() {
     const key = `${item.symbol}:${Math.floor(item.annualized_current * 20)}`;
     if (item.annualized_current >= threshold && !state.lastAlerted.has(key)) {
       new Notification(`${item.ticker} 资金费机会`, {
-        body: `当前年化 ${percent(item.annualized_current)}，持有期净收益预估 ${money(item.projection.net_profit)}`,
+        body: `当前费差年化 ${percent(item.annualized_current)}，持有期净收益预估 ${money(item.projection.net_profit)}`,
       });
       state.lastAlerted.add(key);
     }

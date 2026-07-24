@@ -37,7 +37,6 @@ async def refresh_loop() -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    await service.refresh()
     task = asyncio.create_task(refresh_loop())
     yield
     task.cancel()
@@ -47,7 +46,7 @@ async def lifespan(_: FastAPI):
         pass
 
 
-app = FastAPI(title="BN Stock Carry Monitor", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="BN OKX Funding Monitor", version="2.0.0", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 
@@ -124,4 +123,3 @@ async def stream(request: Request) -> StreamingResponse:
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
-

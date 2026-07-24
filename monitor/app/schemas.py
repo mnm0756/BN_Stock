@@ -6,10 +6,12 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class SettingsUpdate(BaseModel):
+    settings_version: int = 3
     provider_mode: str = "auto"
     refresh_seconds: int = Field(default=15, ge=5, le=300)
     total_capital: float = Field(default=1000.0, gt=0)
     perp_allocation: float = Field(default=0.5, ge=0.1, le=0.9)
+    leverage: float = Field(default=1.0, ge=0.1, le=50)
     holding_days: int = Field(default=30, ge=1, le=365)
     min_annualized: float = Field(default=0.0, ge=-10, le=20)
     execution_mode: str = "maker"
@@ -17,6 +19,10 @@ class SettingsUpdate(BaseModel):
     spot_min_fee: float = Field(default=0.35, ge=0, le=100)
     perp_maker_fee: float = Field(default=0.0, ge=-0.01, le=0.1)
     perp_taker_fee: float = Field(default=0.0004, ge=0, le=0.1)
+    binance_maker_fee: float = Field(default=0.0002, ge=-0.01, le=0.1)
+    binance_taker_fee: float = Field(default=0.0005, ge=0, le=0.1)
+    okx_maker_fee: float = Field(default=0.0002, ge=-0.01, le=0.1)
+    okx_taker_fee: float = Field(default=0.0005, ge=0, le=0.1)
     slippage_bps: float = Field(default=2.0, ge=0, le=1000)
     extra_cost_bps: float = Field(default=0.0, ge=0, le=1000)
     extra_fixed_fee: float = Field(default=0.0, ge=0, le=1000)
@@ -42,9 +48,11 @@ class SettingsUpdate(BaseModel):
     def normalize_symbols(cls, values: list[str]) -> list[str]:
         result = []
         for value in values:
-            symbol = value.strip().upper()
+            symbol = value.strip().upper().replace("-", "")
+            if symbol.endswith("SWAP"):
+                symbol = symbol[:-4]
             if symbol and symbol not in result:
-                result.append(symbol)
+                result.append(symbol if symbol.endswith("USDT") else f"{symbol}USDT")
         if not result:
             raise ValueError("at least one watch symbol is required")
         return result
