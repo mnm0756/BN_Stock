@@ -19,10 +19,10 @@ class SettingsUpdate(BaseModel):
     spot_min_fee: float = Field(default=0.35, ge=0, le=100)
     perp_maker_fee: float = Field(default=0.0, ge=-0.01, le=0.1)
     perp_taker_fee: float = Field(default=0.0004, ge=0, le=0.1)
-    binance_maker_fee: float = Field(default=0.0002, ge=-0.01, le=0.1)
-    binance_taker_fee: float = Field(default=0.0005, ge=0, le=0.1)
-    okx_maker_fee: float = Field(default=0.0002, ge=-0.01, le=0.1)
-    okx_taker_fee: float = Field(default=0.0005, ge=0, le=0.1)
+    binance_maker_fee: float = Field(default=0.00005, ge=-0.01, le=0.1)
+    binance_taker_fee: float = Field(default=0.0004, ge=0, le=0.1)
+    okx_maker_fee: float = Field(default=0.0003, ge=-0.01, le=0.1)
+    okx_taker_fee: float = Field(default=0.0009, ge=0, le=0.1)
     slippage_bps: float = Field(default=2.0, ge=0, le=1000)
     extra_cost_bps: float = Field(default=0.0, ge=0, le=1000)
     extra_fixed_fee: float = Field(default=0.0, ge=0, le=1000)
@@ -49,6 +49,8 @@ class SettingsUpdate(BaseModel):
         result = []
         for value in values:
             symbol = value.strip().upper().replace("-", "")
+            if ":" in symbol:
+                symbol = symbol.split(":", 1)[1]
             if symbol.endswith("SWAP"):
                 symbol = symbol[:-4]
             if symbol and symbol not in result:

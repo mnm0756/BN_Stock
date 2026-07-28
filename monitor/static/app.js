@@ -39,48 +39,56 @@ const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (char) => 
 
 const FEE_SOURCES = [
   {
-    title: "Binance USD-M 永续",
+    title: "Aster 永续",
     status: "已计入",
-    detail: "默认按普通用户 USDT 永续 Maker 0.0200%、Taker 0.0500%，可在设置中改为你的账户费率。",
-    href: "https://www.binance.com/en/fee/futureFee",
+    detail: "默认按 Aster 永续基础档 Maker 0.0050%、Taker 0.0400%，可在设置中改为你的账户费率。",
+    href: "https://docs.asterdex.com/trading/perpetuals/fees-and-specs/fees",
   },
   {
-    title: "OKX USDT 永续",
+    title: "Hyperliquid xyz 永续",
     status: "已计入",
-    detail: "默认按普通用户永续 Maker 0.0200%、Taker 0.0500%，可在设置中改为你的账户费率。",
-    href: "https://www.okx.com/fees",
+    detail: "默认按 HIP-3 市场保守档 Maker 0.0300%、Taker 0.0900%，可在设置中改为你的账户费率。",
+    href: "https://hyperliquid.gitbook.io/hyperliquid-docs/trading/fees",
   },
   {
     title: "资金费数据",
     status: "实时读取",
-    detail: "Binance 使用 premiumIndex/fundingRate；OKX 使用 funding-rate/funding-rate-history。",
-    href: "https://developers.binance.com/en/docs/catalog/core-trading-derivatives-trading-usd-s-m-futures/api/rest-api/market-data",
+    detail: "Aster 使用 premiumIndex/fundingRate；Hyperliquid 使用 metaAndAssetCtxs、l2Book 和 fundingHistory。",
+    href: "https://github.com/asterdex/api-docs",
   },
   {
     title: "划转/资金占用",
     status: "需手动预留",
-    detail: "跨所转账、借币、资金闲置、强平缓冲和账户等级差异不会自动读取，请用额外成本预留。",
-    href: "https://www.okx.com/help/fee-details",
+    detail: "跨链转账、USDT/USDC 兑换、资金闲置、强平缓冲和账户等级差异不会自动读取，请用额外成本预留。",
+    href: "https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint/perpetuals",
   },
 ];
 
-function binanceFuturesUrl(item) {
-  return `https://www.binance.com/en/futures/${encodeURIComponent(item.symbol)}`;
+function asterFuturesUrl(item) {
+  return `https://www.asterdex.com/en/futures/${encodeURIComponent(item.venue_a_symbol || item.symbol)}`;
 }
 
-function okxSwapUrl(item) {
-  return `https://www.okx.com/trade-swap/${encodeURIComponent((item.okx_inst_id || `${item.ticker}-USDT-SWAP`).toLowerCase())}`;
+function hyperliquidUrl(item) {
+  return `https://app.hyperliquid.xyz/trade/${encodeURIComponent(item.hyper_coin || item.venue_b_symbol || `xyz:${item.ticker}`)}`;
+}
+
+function venueA(item) {
+  return item.venue_a_exchange || "Aster";
+}
+
+function venueB(item) {
+  return item.venue_b_exchange || "Hyperliquid";
 }
 
 function marketLinks(item, tone = "compact") {
   const labelClass = tone === "full" ? " full" : "";
   return `
     <div class="market-links${labelClass}">
-      <a class="market-link futures" href="${binanceFuturesUrl(item)}" target="_blank" rel="noreferrer" title="打开 Binance 合约 ${escapeHtml(item.symbol)}">
-        <i data-lucide="external-link"></i><span>Binance</span>
+      <a class="market-link futures" href="${asterFuturesUrl(item)}" target="_blank" rel="noreferrer" title="打开 Aster 合约 ${escapeHtml(item.venue_a_symbol || item.symbol)}">
+        <i data-lucide="external-link"></i><span>Aster</span>
       </a>
-      <a class="market-link stock" href="${okxSwapUrl(item)}" target="_blank" rel="noreferrer" title="打开 OKX 合约 ${escapeHtml(item.okx_inst_id || item.symbol)}">
-        <i data-lucide="external-link"></i><span>OKX</span>
+      <a class="market-link stock" href="${hyperliquidUrl(item)}" target="_blank" rel="noreferrer" title="打开 Hyperliquid 合约 ${escapeHtml(item.hyper_coin || item.venue_b_symbol || item.symbol)}">
+        <i data-lucide="external-link"></i><span>Hyper</span>
       </a>
     </div>
   `;
@@ -161,7 +169,7 @@ function renderStatus() {
   if (source === "demo" || source === "error" || source === "stale") {
     banner.classList.remove("hidden");
     if (source === "stale") {
-      $("#data-banner-text").textContent = `实时刷新暂时失败，当前保留上一份真实行情，请核对 Binance 和 OKX 页面后再交易。原因：${summarizeSourceError(error) || "未知错误"}`;
+      $("#data-banner-text").textContent = `实时刷新暂时失败，当前保留上一份真实行情，请核对 Aster 和 Hyperliquid 页面后再交易。原因：${summarizeSourceError(error) || "未知错误"}`;
     } else if (source === "demo") {
       $("#data-banner-text").textContent = `当前显示演示数据，不可用于交易判断。${error ? `实时接口原因：${summarizeSourceError(error)}` : "已手动启用演示模式。"}`;
     } else {
@@ -287,10 +295,10 @@ function renderOpportunities() {
         </div>
       </td>
       <td><div class="value-stack"><strong class="${valueClass(item.funding_rate)}">${percent(item.funding_rate, 4)}</strong><small>折算年化 ${percent(item.annualized_current)}</small></div></td>
-      <td><div class="value-stack"><strong>${percent(item.binance_funding_rate, 4)} / ${percent(item.okx_funding_rate, 4)}</strong><small>周期 ${hours(item.binance_funding_interval_hours)} / ${hours(item.okx_funding_interval_hours)}</small><small>年化 ${percent(item.binance_annualized)} / ${percent(item.okx_annualized)}</small></div></td>
+      <td><div class="value-stack"><strong>${percent(item.binance_funding_rate, 4)} / ${percent(item.okx_funding_rate, 4)}</strong><small>${escapeHtml(venueA(item))} / ${escapeHtml(venueB(item))}</small><small>周期 ${hours(item.binance_funding_interval_hours)} / ${hours(item.okx_funding_interval_hours)}</small><small>年化 ${percent(item.binance_annualized)} / ${percent(item.okx_annualized)}</small></div></td>
       <td><div class="value-stack"><strong>${escapeHtml(item.short_exchange)} 空 / ${escapeHtml(item.long_exchange)} 多</strong><small>空腿费率 ${percent(item.short_rate, 4)}，多腿费率 ${percent(item.long_rate, 4)}</small></div></td>
       <td><div class="value-stack"><strong>${price(item.short_bid)} / ${price(item.long_ask)}</strong><small>空方 Bid / 多方 Ask，${bps(item.entry_basis_bps)}</small></div></td>
-      <td><div class="value-stack"><strong class="negative">-${money(costs.total)}</strong><small>BN ${money(costs.binance)} / OKX ${money(costs.okx)} / 滑 ${money(costs.slippage)}</small><small>其 ${money(costs.extra)} / ${percent(costs.costPctOfHedge)} 名义</small></div></td>
+      <td><div class="value-stack"><strong class="negative">-${money(costs.total)}</strong><small>${escapeHtml(venueA(item))} ${money(costs.binance)} / ${escapeHtml(venueB(item))} ${money(costs.okx)} / 滑 ${money(costs.slippage)}</small><small>其 ${money(costs.extra)} / ${percent(costs.costPctOfHedge)} 名义</small></div></td>
       <td><div class="value-stack"><strong class="${valueClass(item.projection.net_profit)}">${money(item.projection.net_profit)}</strong><small>${percent(item.projection.return_pct)} / 持有期</small></div></td>
       <td>${riskTag(item)}</td>
     </tr>
@@ -341,10 +349,10 @@ function renderDetail() {
           <div><span>当前费差年化</span><strong class="${valueClass(item.annualized_current)}">${percent(item.annualized_current)}</strong></div>
           <div><span>近7日费差年化</span><strong class="${valueClass(item.annualized_7d)}">${percent(item.annualized_7d)}</strong></div>
         </div>
-        <div class="metric-row"><span>Binance 当前资金费</span><strong class="${valueClass(item.binance_funding_rate)}">${percent(item.binance_funding_rate, 4)} / ${hours(item.binance_funding_interval_hours)}</strong></div>
-        <div class="metric-row"><span>OKX 当前资金费</span><strong class="${valueClass(item.okx_funding_rate)}">${percent(item.okx_funding_rate, 4)} / ${hours(item.okx_funding_interval_hours)}</strong></div>
-        <div class="metric-row"><span>Binance 年化后资金费</span><strong class="${valueClass(item.binance_annualized)}">${percent(item.binance_annualized)}</strong></div>
-        <div class="metric-row"><span>OKX 年化后资金费</span><strong class="${valueClass(item.okx_annualized)}">${percent(item.okx_annualized)}</strong></div>
+        <div class="metric-row"><span>${escapeHtml(venueA(item))} 当前资金费</span><strong class="${valueClass(item.binance_funding_rate)}">${percent(item.binance_funding_rate, 4)} / ${hours(item.binance_funding_interval_hours)}</strong></div>
+        <div class="metric-row"><span>${escapeHtml(venueB(item))} 当前资金费</span><strong class="${valueClass(item.okx_funding_rate)}">${percent(item.okx_funding_rate, 4)} / ${hours(item.okx_funding_interval_hours)}</strong></div>
+        <div class="metric-row"><span>${escapeHtml(venueA(item))} 年化后资金费</span><strong class="${valueClass(item.binance_annualized)}">${percent(item.binance_annualized)}</strong></div>
+        <div class="metric-row"><span>${escapeHtml(venueB(item))} 年化后资金费</span><strong class="${valueClass(item.okx_annualized)}">${percent(item.okx_annualized)}</strong></div>
         <div class="history-bars" aria-label="最近21次跨所资金费差">${bars}</div>
       </div>
       <div class="detail-block">
@@ -358,8 +366,8 @@ function renderDetail() {
         <div class="detail-block-title">持有期收益拆解</div>
         <div class="metric-row"><span>按当前费差预估资金费</span><strong>${money(projection.gross_funding)}</strong></div>
         <div class="metric-row"><span>入场价差贡献</span><strong class="${valueClass(projection.entry_basis_pnl)}">${money(projection.entry_basis_pnl)}</strong></div>
-        <div class="metric-row"><span>Binance 手续费 开+平</span><strong class="negative">-${money(costs.binance)}</strong></div>
-        <div class="metric-row"><span>OKX 手续费 开+平</span><strong class="negative">-${money(costs.okx)}</strong></div>
+        <div class="metric-row"><span>${escapeHtml(venueA(item))} 手续费 开+平</span><strong class="negative">-${money(costs.binance)}</strong></div>
+        <div class="metric-row"><span>${escapeHtml(venueB(item))} 手续费 开+平</span><strong class="negative">-${money(costs.okx)}</strong></div>
         <div class="metric-row"><span>滑点预估 开+平</span><strong class="negative">-${money(costs.slippage)}</strong></div>
         <div class="metric-row"><span>额外预留成本 开+平</span><strong class="negative">-${money(costs.extra)}</strong></div>
         <div class="metric-row"><span>合计交易成本</span><strong class="negative">-${money(costs.total)}</strong></div>
@@ -369,8 +377,8 @@ function renderDetail() {
       </div>
       <div class="detail-block">
         <div class="detail-block-title">费用参数</div>
-        <div class="metric-row"><span>${settings.execution_mode === "maker" ? "Binance 挂单费率" : "Binance 吃单费率"}</span><strong>${percent(binanceFeeRate, 4)}</strong></div>
-        <div class="metric-row"><span>${settings.execution_mode === "maker" ? "OKX 挂单费率" : "OKX 吃单费率"}</span><strong>${percent(okxFeeRate, 4)}</strong></div>
+        <div class="metric-row"><span>${escapeHtml(venueA(item))} ${settings.execution_mode === "maker" ? "挂单费率" : "吃单费率"}</span><strong>${percent(binanceFeeRate, 4)}</strong></div>
+        <div class="metric-row"><span>${escapeHtml(venueB(item))} ${settings.execution_mode === "maker" ? "挂单费率" : "吃单费率"}</span><strong>${percent(okxFeeRate, 4)}</strong></div>
         <div class="metric-row"><span>单边滑点</span><strong>${Number(settings.slippage_bps || 0).toFixed(1)} bps</strong></div>
         <div class="metric-row"><span>额外单边成本</span><strong>${Number(settings.extra_cost_bps || 0).toFixed(1)} bps + ${money(settings.extra_fixed_fee)}</strong></div>
       </div>
@@ -378,10 +386,10 @@ function renderDetail() {
         <div class="detail-block-title">测算公式</div>
         <div class="formula-stack">
           <div class="formula-line"><span>对冲名义</span><strong>总资金 / 2 × 杠杆</strong><em>${money(halfCapital)} × ${leverage.toFixed(1)} = ${money(projection.hedge_notional)}</em></div>
-          <div class="formula-line"><span>费差年化</span><strong>|BN 单期费率 × 24 / BN周期 × 365 - OKX 单期费率 × 24 / OKX周期 × 365|</strong><em>|${percent(item.binance_funding_rate, 4)} × 24 / ${hours(item.binance_funding_interval_hours)} × 365 - ${percent(item.okx_funding_rate, 4)} × 24 / ${hours(item.okx_funding_interval_hours)} × 365| = ${percent(item.annualized_current)}</em></div>
+          <div class="formula-line"><span>费差年化</span><strong>|Aster 单期费率 × 24 / Aster周期 × 365 - Hyper 单期费率 × 24 / Hyper周期 × 365|</strong><em>|${percent(item.binance_funding_rate, 4)} × 24 / ${hours(item.binance_funding_interval_hours)} × 365 - ${percent(item.okx_funding_rate, 4)} × 24 / ${hours(item.okx_funding_interval_hours)} × 365| = ${percent(item.annualized_current)}</em></div>
           <div class="formula-line"><span>资金费</span><strong>对冲名义 × 当前费差年化 × 持有天数 / 365</strong><em>${money(projection.hedge_notional)} × ${percent(item.annualized_current)} × ${Number(settings.holding_days || 0)} / 365 = ${money(projection.gross_funding)}</em></div>
           <div class="formula-line"><span>价差贡献</span><strong>对冲名义 × 入场价差 bps / 10000</strong><em>${money(projection.hedge_notional)} × ${Number(item.entry_basis_bps || 0).toFixed(1)} / 10000 = ${money(projection.entry_basis_pnl)}</em></div>
-          <div class="formula-line"><span>单边费用</span><strong>Binance 手续费 + OKX 手续费 + 双腿滑点 + 额外预留</strong><em>${money(projection.binance_open_fee)} + ${money(projection.okx_open_fee)} + ${money(projection.slippage_open)} + ${money(projection.extra_open_fee)} = ${money(projection.opening_cost)}</em></div>
+          <div class="formula-line"><span>单边费用</span><strong>Aster 手续费 + Hyper 手续费 + 双腿滑点 + 额外预留</strong><em>${money(projection.binance_open_fee)} + ${money(projection.okx_open_fee)} + ${money(projection.slippage_open)} + ${money(projection.extra_open_fee)} = ${money(projection.opening_cost)}</em></div>
           <div class="formula-line"><span>总费用</span><strong>2 × 单边费用</strong><em>2 × ${money(projection.opening_cost)} = ${money(costs.total)}</em></div>
           <div class="formula-line total"><span>净收益</span><strong>资金费 + 价差贡献 - 总费用</strong><em>${money(projection.gross_funding)} ${signedMoney(projection.entry_basis_pnl)} - ${money(costs.total)} = ${money(projection.net_profit)}</em></div>
         </div>

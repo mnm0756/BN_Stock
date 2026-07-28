@@ -46,7 +46,7 @@ async def lifespan(_: FastAPI):
         pass
 
 
-app = FastAPI(title="BN OKX Funding Monitor", version="2.0.0", lifespan=lifespan)
+app = FastAPI(title="CXMT Basis Monitor", version="3.0.0", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 
 

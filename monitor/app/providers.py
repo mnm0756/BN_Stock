@@ -29,6 +29,7 @@ SYMBOL_NAMES = {
     "NEARUSDT": "NEAR",
     "AAVEUSDT": "Aave",
     "UNIUSDT": "Uniswap",
+    "CXMTUSDT": "ChangXin Memory",
 }
 
 
@@ -58,6 +59,11 @@ def okx_inst_id(symbol: str) -> str:
     return f"{base}-USDT-SWAP"
 
 
+def hyper_coin(symbol: str) -> str:
+    base = normalize_symbol(symbol).removesuffix("USDT")
+    return f"xyz:{base}"
+
+
 def _float(value: Any, default: float = 0.0) -> float:
     try:
         return float(value)
@@ -70,6 +76,319 @@ def _int(value: Any, default: int = 0) -> int:
         return int(value)
     except (TypeError, ValueError):
         return default
+
+
+def _next_hour_millis() -> int:
+    now_ms = int(time.time() * 1000)
+    hour_ms = 3_600_000
+    return (now_ms // hour_ms + 1) * hour_ms
+
+
+class AsterHyperliquidFundingProvider:
+    def __init__(self, aster_base_url: str, hyperliquid_info_url: str) -> None:
+        self.aster_base_url = aster_base_url.rstrip("/")
+        self.hyperliquid_info_url = hyperliquid_info_url
+        self._history_cache: tuple[float, dict[str, dict[str, list[dict[str, Any]]]]] = (
+            0.0,
+            {"aster": {}, "hyper": {}},
+        )
+
+    async def _get_json(
+        self,
+        client: httpx.AsyncClient,
+        path: str,
+        params: dict[str, Any] | None = None,
+    ) -> Any:
+        last_error: Exception | None = None
+        for _ in range(2):
+            try:
+                response = await client.get(f"{self.aster_base_url}{path}", params=params)
+                response.raise_for_status()
+                payload = response.json()
+                if isinstance(payload, dict) and payload.get("code") not in (None, 0, "0", 200):
+                    raise ProviderError(str(payload.get("msg") or payload))
+                return payload
+            except Exception as exc:
+                last_error = exc
+                await asyncio.sleep(0.25)
+        assert last_error is not None
+        raise last_error
+
+    async def _post_hyper(self, client: httpx.AsyncClient, payload: dict[str, Any]) -> Any:
+        last_error: Exception | None = None
+        for _ in range(2):
+            try:
+                response = await client.post(self.hyperliquid_info_url, json=payload)
+                response.raise_for_status()
+                return response.json()
+            except Exception as exc:
+                last_error = exc
+                await asyncio.sleep(0.25)
+        assert last_error is not None
+        raise last_error
+
+    async def fetch(self, symbols: list[str]) -> dict[str, Any]:
+        wanted = [normalize_symbol(symbol) for symbol in symbols]
+        timeout = httpx.Timeout(18.0, connect=10.0)
+        headers = {"User-Agent": "bn-cxmt-basis-monitor/1.0"}
+        try:
+            async with httpx.AsyncClient(timeout=timeout, headers=headers, follow_redirects=True) as client:
+                (
+                    aster_premium,
+                    aster_books,
+                    aster_funding_info,
+                    hyper_meta,
+                    hyper_books,
+                    histories,
+                ) = await asyncio.gather(
+                    self._aster_premiums(client, wanted),
+                    self._aster_books(client, wanted),
+                    self._aster_funding_info(client, wanted),
+                    self._post_hyper(client, {"type": "metaAndAssetCtxs", "dex": "xyz"}),
+                    self._hyper_books(client, wanted),
+                    self._funding_histories(client, wanted),
+                )
+        except Exception as exc:
+            raise ProviderError(f"Aster/Hyperliquid public API unavailable: {_describe_exception(exc)}") from exc
+
+        hyper_ctx_map = self._hyper_contexts(hyper_meta)
+        records = []
+        for symbol in wanted:
+            coin = hyper_coin(symbol)
+            aster_price = aster_premium.get(symbol)
+            aster_book = aster_books.get(symbol)
+            aster_info = aster_funding_info.get(symbol, {})
+            hyper_ctx = hyper_ctx_map.get(coin)
+            hyper_book = hyper_books.get(coin)
+            if not aster_price or not aster_book or not hyper_ctx or not hyper_book:
+                continue
+            record = self._record(symbol, coin, aster_price, aster_book, aster_info, hyper_ctx, hyper_book, histories)
+            if record:
+                records.append(record)
+        if not records:
+            raise ProviderError("No configured Aster/Hyperliquid CXMT symbols were returned by both venues")
+        return {"source": "live", "records": records, "error": None}
+
+    async def _aster_premiums(self, client: httpx.AsyncClient, symbols: list[str]) -> dict[str, dict[str, Any]]:
+        semaphore = asyncio.Semaphore(5)
+
+        async def one(symbol: str) -> tuple[str, dict[str, Any]]:
+            async with semaphore:
+                payload = await self._get_json(client, "/fapi/v3/premiumIndex", {"symbol": symbol})
+                return symbol, payload if isinstance(payload, dict) else {}
+
+        results = await asyncio.gather(*(one(symbol) for symbol in symbols), return_exceptions=True)
+        return {symbol: row for result in results if not isinstance(result, Exception) for symbol, row in [result]}
+
+    async def _aster_books(self, client: httpx.AsyncClient, symbols: list[str]) -> dict[str, dict[str, Any]]:
+        semaphore = asyncio.Semaphore(5)
+
+        async def one(symbol: str) -> tuple[str, dict[str, Any]]:
+            async with semaphore:
+                payload = await self._get_json(client, "/fapi/v3/ticker/bookTicker", {"symbol": symbol})
+                return symbol, payload if isinstance(payload, dict) else {}
+
+        results = await asyncio.gather(*(one(symbol) for symbol in symbols), return_exceptions=True)
+        return {symbol: row for result in results if not isinstance(result, Exception) for symbol, row in [result]}
+
+    async def _aster_funding_info(self, client: httpx.AsyncClient, symbols: list[str]) -> dict[str, dict[str, Any]]:
+        semaphore = asyncio.Semaphore(5)
+
+        async def one(symbol: str) -> tuple[str, dict[str, Any]]:
+            async with semaphore:
+                payload = await self._get_json(client, "/fapi/v3/fundingInfo", {"symbol": symbol})
+                rows = payload if isinstance(payload, list) else []
+                row = next((item for item in rows if item.get("symbol") == symbol), {})
+                return symbol, row
+
+        results = await asyncio.gather(*(one(symbol) for symbol in symbols), return_exceptions=True)
+        return {symbol: row for result in results if not isinstance(result, Exception) for symbol, row in [result]}
+
+    async def _hyper_books(self, client: httpx.AsyncClient, symbols: list[str]) -> dict[str, dict[str, Any]]:
+        semaphore = asyncio.Semaphore(5)
+
+        async def one(symbol: str) -> tuple[str, dict[str, Any]]:
+            coin = hyper_coin(symbol)
+            async with semaphore:
+                payload = await self._post_hyper(client, {"type": "l2Book", "coin": coin})
+                return coin, payload if isinstance(payload, dict) else {}
+
+        results = await asyncio.gather(*(one(symbol) for symbol in symbols), return_exceptions=True)
+        return {coin: row for result in results if not isinstance(result, Exception) for coin, row in [result]}
+
+    def _hyper_contexts(self, payload: Any) -> dict[str, dict[str, Any]]:
+        if not isinstance(payload, list) or len(payload) < 2:
+            return {}
+        meta, contexts = payload[0], payload[1]
+        universe = meta.get("universe", []) if isinstance(meta, dict) else []
+        if not isinstance(universe, list) or not isinstance(contexts, list):
+            return {}
+        return {
+            asset.get("name"): ctx
+            for asset, ctx in zip(universe, contexts)
+            if isinstance(asset, dict) and isinstance(ctx, dict)
+        }
+
+    async def _funding_histories(
+        self,
+        client: httpx.AsyncClient,
+        symbols: list[str],
+    ) -> dict[str, dict[str, list[dict[str, Any]]]]:
+        cached_at, cached = self._history_cache
+        if time.time() - cached_at < 300 and all(
+            symbol in cached["aster"] and symbol in cached["hyper"] for symbol in symbols
+        ):
+            return cached
+        semaphore = asyncio.Semaphore(5)
+        start_time = int((time.time() - 7 * 24 * 60 * 60) * 1000)
+
+        async def aster_one(symbol: str) -> tuple[str, list[dict[str, Any]]]:
+            async with semaphore:
+                payload = await self._get_json(client, "/fapi/v3/fundingRate", {"symbol": symbol, "limit": 168})
+                return symbol, payload if isinstance(payload, list) else []
+
+        async def hyper_one(symbol: str) -> tuple[str, list[dict[str, Any]]]:
+            async with semaphore:
+                payload = await self._post_hyper(
+                    client,
+                    {"type": "fundingHistory", "coin": hyper_coin(symbol), "startTime": start_time},
+                )
+                rows = payload if isinstance(payload, list) else []
+                return symbol, rows[-168:]
+
+        aster_results = await asyncio.gather(*(aster_one(symbol) for symbol in symbols), return_exceptions=True)
+        hyper_results = await asyncio.gather(*(hyper_one(symbol) for symbol in symbols), return_exceptions=True)
+        merged = {"aster": dict(cached["aster"]), "hyper": dict(cached["hyper"])}
+        for result in aster_results:
+            if not isinstance(result, Exception):
+                symbol, rows = result
+                merged["aster"][symbol] = rows
+        for result in hyper_results:
+            if not isinstance(result, Exception):
+                symbol, rows = result
+                merged["hyper"][symbol] = rows
+        self._history_cache = (time.time(), merged)
+        return merged
+
+    def _record(
+        self,
+        symbol: str,
+        coin: str,
+        aster_price: dict[str, Any],
+        aster_book: dict[str, Any],
+        aster_info: dict[str, Any],
+        hyper_ctx: dict[str, Any],
+        hyper_book: dict[str, Any],
+        histories: dict[str, dict[str, list[dict[str, Any]]]],
+    ) -> dict[str, Any] | None:
+        aster_rate = _float(aster_price.get("lastFundingRate"))
+        hyper_rate = _float(hyper_ctx.get("funding"))
+        aster_interval = _float(aster_info.get("fundingIntervalHours"), 1.0) or 1.0
+        hyper_interval = 1.0
+        aster_annualized = annualize_funding(aster_rate, aster_interval)
+        hyper_annualized = annualize_funding(hyper_rate, hyper_interval)
+
+        aster_bid = _float(aster_book.get("bidPrice"))
+        aster_ask = _float(aster_book.get("askPrice"))
+        hyper_bid, hyper_ask = self._hyper_bid_ask(hyper_book)
+        if min(aster_bid, aster_ask, hyper_bid, hyper_ask) <= 0:
+            return None
+
+        if aster_annualized >= hyper_annualized:
+            short_exchange = "Aster"
+            long_exchange = "Hyperliquid"
+            short_bid = aster_bid
+            short_ask = aster_ask
+            long_bid = hyper_bid
+            long_ask = hyper_ask
+            short_rate = aster_rate
+            long_rate = hyper_rate
+        else:
+            short_exchange = "Hyperliquid"
+            long_exchange = "Aster"
+            short_bid = hyper_bid
+            short_ask = hyper_ask
+            long_bid = aster_bid
+            long_ask = aster_ask
+            short_rate = hyper_rate
+            long_rate = aster_rate
+
+        spread_annualized = abs(aster_annualized - hyper_annualized)
+        history_rates = self._spread_history_rates(symbol, aster_interval, hyper_interval)
+        historical_annualized = annualize_average(history_rates, 8.0)
+        entry_basis_bps = (short_bid / long_ask - 1) * 10_000
+        funding_times = [_int(aster_price.get("nextFundingTime")), _next_hour_millis()]
+        return {
+            "symbol": symbol,
+            "ticker": symbol.removesuffix("USDT"),
+            "name": SYMBOL_NAMES.get(symbol, symbol.removesuffix("USDT")),
+            "venue_a_exchange": "Aster",
+            "venue_b_exchange": "Hyperliquid",
+            "venue_a_symbol": symbol,
+            "venue_b_symbol": coin,
+            "hyper_coin": coin,
+            "okx_inst_id": coin,
+            "funding_rate": spread_annualized / (365 * 3),
+            "funding_interval_hours": 8.0,
+            "binance_funding_interval_hours": aster_interval,
+            "okx_funding_interval_hours": hyper_interval,
+            "next_funding_time": min(value for value in funding_times if value),
+            "binance_funding_rate": aster_rate,
+            "okx_funding_rate": hyper_rate,
+            "binance_annualized": aster_annualized,
+            "okx_annualized": hyper_annualized,
+            "funding_spread_annualized": spread_annualized,
+            "annualized_7d": historical_annualized,
+            "short_exchange": short_exchange,
+            "long_exchange": long_exchange,
+            "short_rate": short_rate,
+            "long_rate": long_rate,
+            "binance_mark_price": _float(aster_price.get("markPrice")),
+            "binance_index_price": _float(aster_price.get("indexPrice")),
+            "binance_bid": aster_bid,
+            "binance_ask": aster_ask,
+            "okx_last": _float(hyper_ctx.get("midPx"), _float(hyper_ctx.get("markPx"))),
+            "okx_bid": hyper_bid,
+            "okx_ask": hyper_ask,
+            "short_bid": short_bid,
+            "short_ask": short_ask,
+            "long_bid": long_bid,
+            "long_ask": long_ask,
+            "entry_basis_bps": entry_basis_bps,
+            "history_rates": history_rates,
+            "history": histories["aster"].get(symbol, []),
+        }
+
+    def _hyper_bid_ask(self, book: dict[str, Any]) -> tuple[float, float]:
+        levels = book.get("levels", [])
+        if not isinstance(levels, list) or len(levels) < 2:
+            return 0.0, 0.0
+        bids = levels[0] if isinstance(levels[0], list) else []
+        asks = levels[1] if isinstance(levels[1], list) else []
+        best_bid = _float(bids[0].get("px")) if bids and isinstance(bids[0], dict) else 0.0
+        best_ask = _float(asks[0].get("px")) if asks and isinstance(asks[0], dict) else 0.0
+        return best_bid, best_ask
+
+    def _spread_history_rates(self, symbol: str, aster_interval: float, hyper_interval: float) -> list[float]:
+        _, cached = self._history_cache
+        aster_rows = cached["aster"].get(symbol, [])
+        hyper_rows = cached["hyper"].get(symbol, [])
+        hyper_by_hour = {
+            _int(row.get("time")) // 3_600_000: _float(row.get("fundingRate"))
+            for row in hyper_rows
+        }
+        rates = []
+        for row in aster_rows:
+            hour = _int(row.get("fundingTime")) // 3_600_000
+            hyper_rate = hyper_by_hour.get(hour)
+            if hyper_rate is None:
+                continue
+            spread_annualized = abs(
+                annualize_funding(_float(row.get("fundingRate")), aster_interval)
+                - annualize_funding(hyper_rate, hyper_interval)
+            )
+            rates.append(spread_annualized / (365 * 3))
+        return rates[-21:]
 
 
 class BinanceOkxFundingProvider:
@@ -359,18 +678,7 @@ class BinanceOkxFundingProvider:
 
 class DemoProvider:
     BASE = [
-        ("BTCUSDT", 65100, 0.000031, -0.000008, 1.4),
-        ("ETHUSDT", 1928, 0.000015, 0.000042, -0.8),
-        ("SOLUSDT", 126.8, 0.000090, 0.000018, 2.0),
-        ("XRPUSDT", 1.13, -0.000020, 0.000034, -1.2),
-        ("DOGEUSDT", 0.167, 0.000055, 0.000006, 3.6),
-        ("BNBUSDT", 544, 0.000008, 0.000026, 0.7),
-        ("ADAUSDT", 0.482, 0.000012, -0.000018, -0.4),
-        ("LINKUSDT", 14.2, 0.000033, 0.000011, 1.1),
-        ("AVAXUSDT", 19.7, -0.000010, 0.000049, -2.2),
-        ("SUIUSDT", 2.82, 0.000063, 0.000020, 1.8),
-        ("LTCUSDT", 83.5, 0.000018, 0.000004, 0.5),
-        ("BCHUSDT", 216.3, 0.000022, -0.000014, 1.0),
+        ("CXMTUSDT", 6.70, -0.0078, -0.0036, -18.0),
     ]
 
     async def fetch(self, symbols: list[str], reason: str | None = None) -> dict[str, Any]:
@@ -386,11 +694,11 @@ class DemoProvider:
             o_price = price * (1 + wave + basis_bps / 10_000)
             b_spread = max(b_price * 0.00008, 0.00001)
             o_spread = max(o_price * 0.0001, 0.00001)
-            b_annualized = annualize_funding(binance_rate, 8)
-            o_annualized = annualize_funding(okx_rate, 8)
+            b_annualized = annualize_funding(binance_rate, 1)
+            o_annualized = annualize_funding(okx_rate, 1)
             if b_annualized >= o_annualized:
-                short_exchange = "Binance"
-                long_exchange = "OKX"
+                short_exchange = "Aster"
+                long_exchange = "Hyperliquid"
                 short_bid = b_price - b_spread / 2
                 short_ask = b_price + b_spread / 2
                 long_bid = o_price - o_spread / 2
@@ -398,8 +706,8 @@ class DemoProvider:
                 short_rate = binance_rate
                 long_rate = okx_rate
             else:
-                short_exchange = "OKX"
-                long_exchange = "Binance"
+                short_exchange = "Hyperliquid"
+                long_exchange = "Aster"
                 short_bid = o_price - o_spread / 2
                 short_ask = o_price + o_spread / 2
                 long_bid = b_price - b_spread / 2
@@ -408,7 +716,7 @@ class DemoProvider:
                 long_rate = binance_rate
             spread_annualized = abs(b_annualized - o_annualized)
             history_rates = [
-                abs((binance_rate - okx_rate) * (0.72 + 0.28 * math.sin(i * 0.7 + index)))
+                spread_annualized / (365 * 3) * (0.72 + 0.28 * math.sin(i * 0.7 + index))
                 for i in range(21)
             ]
             records.append(
@@ -416,11 +724,16 @@ class DemoProvider:
                     "symbol": symbol,
                     "ticker": symbol.removesuffix("USDT"),
                     "name": SYMBOL_NAMES.get(symbol, symbol.removesuffix("USDT")),
-                    "okx_inst_id": okx_inst_id(symbol),
+                    "venue_a_exchange": "Aster",
+                    "venue_b_exchange": "Hyperliquid",
+                    "venue_a_symbol": symbol,
+                    "venue_b_symbol": hyper_coin(symbol),
+                    "hyper_coin": hyper_coin(symbol),
+                    "okx_inst_id": hyper_coin(symbol),
                     "funding_rate": spread_annualized / (365 * 3),
                     "funding_interval_hours": 8.0,
-                    "binance_funding_interval_hours": 8.0,
-                    "okx_funding_interval_hours": 8.0,
+                    "binance_funding_interval_hours": 1.0,
+                    "okx_funding_interval_hours": 1.0,
                     "next_funding_time": next_funding,
                     "binance_funding_rate": binance_rate,
                     "okx_funding_rate": okx_rate,

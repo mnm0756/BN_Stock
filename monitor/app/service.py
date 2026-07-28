@@ -12,13 +12,16 @@ from .calculator import (
 )
 from .config import config
 from .db import Database
-from .providers import BinanceOkxFundingProvider, DemoProvider, ProviderError
+from .providers import AsterHyperliquidFundingProvider, DemoProvider, ProviderError
 
 
 class MonitorService:
     def __init__(self, db: Database) -> None:
         self.db = db
-        self.provider = BinanceOkxFundingProvider(config.binance_futures_base_url, config.okx_base_url)
+        self.provider = AsterHyperliquidFundingProvider(
+            config.aster_futures_base_url,
+            config.hyperliquid_info_url,
+        )
         self.demo = DemoProvider()
         self.snapshot: dict[str, Any] = {
             "status": "starting",

@@ -1,2 +1,1 @@
-"""Binance stock carry monitor."""
-
+"""CXMT cross-venue funding monitor."""

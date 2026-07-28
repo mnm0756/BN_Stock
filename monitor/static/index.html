@@ -4,18 +4,18 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light" />
-    <title>BN OKX Funding Carry</title>
+    <title>CXMT Basis Monitor</title>
     <link rel="preconnect" href="https://cdn.jsdelivr.net" />
-    <link rel="stylesheet" href="/static/styles.css?v=2.0.1" />
+    <link rel="stylesheet" href="/static/styles.css?v=3.0.0" />
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
         <div class="brand-block">
-          <div class="brand-mark" aria-hidden="true">BN</div>
+          <div class="brand-mark" aria-hidden="true">CX</div>
           <div>
-            <h1>BN OKX Funding</h1>
-            <p>Binance × OKX 永续资金费差</p>
+            <h1>CXMT Basis</h1>
+            <p>Aster × Hyperliquid 跨所资金费差</p>
           </div>
         </div>
 
@@ -59,7 +59,7 @@
             <small id="kpi-profitable-count">-- 个费用后为正</small>
           </article>
           <article class="kpi-item accent-green">
-            <span class="kpi-label">当前费率最高</span>
+            <span class="kpi-label">当前费差最高</span>
             <strong id="kpi-best-annualized">--</strong>
             <small id="kpi-best-symbol">--</small>
           </article>
@@ -146,7 +146,7 @@
 
               <div class="source-note">
                 <i data-lucide="info"></i>
-                <p>同一 USDT 永续在 Binance 和 OKX 之间对冲，做空资金费更高的一边，做多更低的一边。</p>
+                <p>监控 Aster 的 CXMTUSDT 与 Hyperliquid 的 xyz:CXMT，做空资金费年化更高的一边，做多更低的一边。</p>
               </div>
             </aside>
 
@@ -170,7 +170,7 @@
                     <tr>
                       <th>标的</th>
                       <th>资金费差</th>
-                      <th>Binance / OKX</th>
+                      <th>Aster / Hyperliquid</th>
                       <th>方向</th>
                       <th>入场盘口</th>
                       <th>预估费用</th>
@@ -245,19 +245,19 @@
             <input id="refresh-seconds-input" type="number" min="5" max="300" />
           </label>
           <label>
-            <span>Binance 挂单费率</span>
+            <span>Aster 挂单费率</span>
             <input id="spot-fee-input" type="number" min="0" max="0.1" step="0.0001" />
           </label>
           <label>
-            <span>Binance 吃单费率</span>
+            <span>Aster 吃单费率</span>
             <input id="spot-min-fee-input" type="number" min="0" step="0.0001" />
           </label>
           <label>
-            <span>OKX 挂单费率</span>
+            <span>Hyperliquid 挂单费率</span>
             <input id="maker-fee-input" type="number" min="-0.01" max="0.1" step="0.0001" />
           </label>
           <label>
-            <span>OKX 吃单费率</span>
+            <span>Hyperliquid 吃单费率</span>
             <input id="taker-fee-input" type="number" min="0" max="0.1" step="0.0001" />
           </label>
           <label>
@@ -305,7 +305,7 @@
         <div class="modal-body position-layout">
           <label>
             <span>合约代码</span>
-            <input id="position-symbol-input" type="text" required placeholder="BTCUSDT" />
+            <input id="position-symbol-input" type="text" required placeholder="CXMTUSDT" />
           </label>
           <label>
             <span>币数量</span>
@@ -352,6 +352,6 @@
     <div id="toast-region" class="toast-region" aria-live="polite"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
-    <script src="/static/app.js?v=2.0.1" defer></script>
+    <script src="/static/app.js?v=3.0.0" defer></script>
   </body>
 </html>

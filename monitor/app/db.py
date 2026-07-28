@@ -8,7 +8,7 @@ from typing import Any
 
 
 DEFAULT_SETTINGS: dict[str, Any] = {
-    "settings_version": 3,
+    "settings_version": 4,
     "provider_mode": "auto",
     "refresh_seconds": 15,
     "total_capital": 1000.0,
@@ -21,29 +21,15 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "spot_min_fee": 0.35,
     "perp_maker_fee": 0.0,
     "perp_taker_fee": 0.0004,
-    "binance_maker_fee": 0.0002,
-    "binance_taker_fee": 0.0005,
-    "okx_maker_fee": 0.0002,
-    "okx_taker_fee": 0.0005,
+    "binance_maker_fee": 0.00005,
+    "binance_taker_fee": 0.0004,
+    "okx_maker_fee": 0.0003,
+    "okx_taker_fee": 0.0009,
     "slippage_bps": 2.0,
     "extra_cost_bps": 0.0,
     "extra_fixed_fee": 0.0,
     "alert_annualized": 0.5,
-    "watch_symbols": [
-        "BTCUSDT",
-        "ETHUSDT",
-        "SOLUSDT",
-        "XRPUSDT",
-        "DOGEUSDT",
-        "BNBUSDT",
-        "ADAUSDT",
-        "LINKUSDT",
-        "AVAXUSDT",
-        "SUIUSDT",
-        "LTCUSDT",
-        "BCHUSDT",
-        "BARDUSDT",
-    ],
+    "watch_symbols": ["CXMTUSDT"],
 }
 
 LEGACY_STOCK_SYMBOLS = {
@@ -98,6 +84,18 @@ class Database:
         saved = json.loads(row["payload"]) if row else {}
         merged = {**DEFAULT_SETTINGS, **saved}
         watch_symbols = set(merged.get("watch_symbols") or [])
+        if saved.get("settings_version", 1) < 4:
+            merged["settings_version"] = DEFAULT_SETTINGS["settings_version"]
+            merged["watch_symbols"] = DEFAULT_SETTINGS["watch_symbols"]
+            for key in (
+                "binance_maker_fee",
+                "binance_taker_fee",
+                "okx_maker_fee",
+                "okx_taker_fee",
+                "min_annualized",
+                "alert_annualized",
+            ):
+                merged[key] = DEFAULT_SETTINGS[key]
         if (saved.get("settings_version", 1) < 3 and watch_symbols & LEGACY_STOCK_SYMBOLS):
             merged["watch_symbols"] = DEFAULT_SETTINGS["watch_symbols"]
         return merged

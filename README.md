@@ -1,6 +1,6 @@
-# BN OKX Funding Monitor
+# CXMT Basis Monitor
 
-Binance / OKX USDT perpetual funding-spread monitor with a local web dashboard.
+Aster / Hyperliquid CXMT perpetual funding-spread monitor with a local web dashboard.
 
 The runnable app lives in `monitor/`.
 
