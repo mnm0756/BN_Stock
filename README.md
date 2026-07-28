@@ -1,6 +1,6 @@
-# CXMT Basis Monitor
+# BN Wallet CXMT Basis Monitor
 
-Aster / Hyperliquid CXMT perpetual funding-spread monitor with a local web dashboard.
+Binance Wallet/Aster and Hyperliquid CXMT perpetual funding-spread monitor with a local web dashboard.
 
 The runnable app lives in `monitor/`.
 

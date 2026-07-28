@@ -84,7 +84,7 @@ def test_negative_funding_direction_longs_more_negative_leg() -> None:
                 "symbol": "CXMTUSDT",
                 "ticker": "CXMT",
                 "name": "ChangXin Memory",
-                "venue_a_exchange": "Aster",
+                "venue_a_exchange": "BN 钱包/Aster",
                 "venue_b_exchange": "Hyperliquid",
                 "funding_rate": 0.0,
                 "funding_interval_hours": 8.0,
@@ -98,7 +98,7 @@ def test_negative_funding_direction_longs_more_negative_leg() -> None:
                 "funding_spread_annualized": 35.04,
                 "annualized_7d": 1.0,
                 "short_exchange": "Hyperliquid",
-                "long_exchange": "Aster",
+                "long_exchange": "BN 钱包/Aster",
                 "short_rate": -0.003,
                 "long_rate": -0.007,
                 "binance_mark_price": 6.7,
@@ -121,5 +121,5 @@ def test_negative_funding_direction_longs_more_negative_leg() -> None:
     )
 
     assert item["short_exchange"] == "Hyperliquid"
-    assert item["long_exchange"] == "Aster"
+    assert item["long_exchange"] == "BN 钱包/Aster"
     assert item["projection"]["gross_funding"] > 0

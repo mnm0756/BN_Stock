@@ -4,9 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light" />
-    <title>CXMT Basis Monitor</title>
+    <title>BN Wallet CXMT Basis Monitor</title>
     <link rel="preconnect" href="https://cdn.jsdelivr.net" />
-    <link rel="stylesheet" href="/static/styles.css?v=3.0.0" />
+    <link rel="stylesheet" href="/static/styles.css?v=3.1.0" />
   </head>
   <body>
     <div class="app-shell">
@@ -15,7 +15,7 @@
           <div class="brand-mark" aria-hidden="true">CX</div>
           <div>
             <h1>CXMT Basis</h1>
-            <p>Aster × Hyperliquid 跨所资金费差</p>
+            <p>BN 钱包/Aster × Hyperliquid 资金费差</p>
           </div>
         </div>
 
@@ -146,7 +146,7 @@
 
               <div class="source-note">
                 <i data-lucide="info"></i>
-                <p>监控 Aster 的 CXMTUSDT 与 Hyperliquid 的 xyz:CXMT，做空资金费年化更高的一边，做多更低的一边。</p>
+                <p>监控币安钱包里的 CXMTUSDT 与 Hyperliquid 的 xyz:CXMT，做空资金费年化更高的一边，做多更低的一边。</p>
               </div>
             </aside>
 
@@ -170,7 +170,7 @@
                     <tr>
                       <th>标的</th>
                       <th>资金费差</th>
-                      <th>Aster / Hyperliquid</th>
+                      <th>BN 钱包 / Hyperliquid</th>
                       <th>方向</th>
                       <th>入场盘口</th>
                       <th>预估费用</th>
@@ -245,11 +245,11 @@
             <input id="refresh-seconds-input" type="number" min="5" max="300" />
           </label>
           <label>
-            <span>Aster 挂单费率</span>
+            <span>BN 钱包/Aster 挂单费率</span>
             <input id="spot-fee-input" type="number" min="0" max="0.1" step="0.0001" />
           </label>
           <label>
-            <span>Aster 吃单费率</span>
+            <span>BN 钱包/Aster 吃单费率</span>
             <input id="spot-min-fee-input" type="number" min="0" step="0.0001" />
           </label>
           <label>
@@ -352,6 +352,6 @@
     <div id="toast-region" class="toast-region" aria-live="polite"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js"></script>
-    <script src="/static/app.js?v=3.0.0" defer></script>
+    <script src="/static/app.js?v=3.1.0" defer></script>
   </body>
 </html>

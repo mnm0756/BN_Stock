@@ -149,7 +149,7 @@ class AsterHyperliquidFundingProvider:
                     self._funding_histories(client, wanted),
                 )
         except Exception as exc:
-            raise ProviderError(f"Aster/Hyperliquid public API unavailable: {_describe_exception(exc)}") from exc
+            raise ProviderError(f"BN Wallet/Aster and Hyperliquid public API unavailable: {_describe_exception(exc)}") from exc
 
         hyper_ctx_map = self._hyper_contexts(hyper_meta)
         records = []
@@ -166,7 +166,7 @@ class AsterHyperliquidFundingProvider:
             if record:
                 records.append(record)
         if not records:
-            raise ProviderError("No configured Aster/Hyperliquid CXMT symbols were returned by both venues")
+            raise ProviderError("No configured BN Wallet/Aster and Hyperliquid CXMT symbols were returned by both venues")
         return {"source": "live", "records": records, "error": None}
 
     async def _aster_premiums(self, client: httpx.AsyncClient, symbols: list[str]) -> dict[str, dict[str, Any]]:
@@ -295,7 +295,7 @@ class AsterHyperliquidFundingProvider:
             return None
 
         if aster_annualized >= hyper_annualized:
-            short_exchange = "Aster"
+            short_exchange = "BN 钱包/Aster"
             long_exchange = "Hyperliquid"
             short_bid = aster_bid
             short_ask = aster_ask
@@ -305,7 +305,7 @@ class AsterHyperliquidFundingProvider:
             long_rate = hyper_rate
         else:
             short_exchange = "Hyperliquid"
-            long_exchange = "Aster"
+            long_exchange = "BN 钱包/Aster"
             short_bid = hyper_bid
             short_ask = hyper_ask
             long_bid = aster_bid
@@ -322,7 +322,7 @@ class AsterHyperliquidFundingProvider:
             "symbol": symbol,
             "ticker": symbol.removesuffix("USDT"),
             "name": SYMBOL_NAMES.get(symbol, symbol.removesuffix("USDT")),
-            "venue_a_exchange": "Aster",
+            "venue_a_exchange": "BN 钱包/Aster",
             "venue_b_exchange": "Hyperliquid",
             "venue_a_symbol": symbol,
             "venue_b_symbol": coin,
@@ -697,7 +697,7 @@ class DemoProvider:
             b_annualized = annualize_funding(binance_rate, 1)
             o_annualized = annualize_funding(okx_rate, 1)
             if b_annualized >= o_annualized:
-                short_exchange = "Aster"
+                short_exchange = "BN 钱包/Aster"
                 long_exchange = "Hyperliquid"
                 short_bid = b_price - b_spread / 2
                 short_ask = b_price + b_spread / 2
@@ -707,7 +707,7 @@ class DemoProvider:
                 long_rate = okx_rate
             else:
                 short_exchange = "Hyperliquid"
-                long_exchange = "Aster"
+                long_exchange = "BN 钱包/Aster"
                 short_bid = o_price - o_spread / 2
                 short_ask = o_price + o_spread / 2
                 long_bid = b_price - b_spread / 2
@@ -724,7 +724,7 @@ class DemoProvider:
                     "symbol": symbol,
                     "ticker": symbol.removesuffix("USDT"),
                     "name": SYMBOL_NAMES.get(symbol, symbol.removesuffix("USDT")),
-                    "venue_a_exchange": "Aster",
+                    "venue_a_exchange": "BN 钱包/Aster",
                     "venue_b_exchange": "Hyperliquid",
                     "venue_a_symbol": symbol,
                     "venue_b_symbol": hyper_coin(symbol),

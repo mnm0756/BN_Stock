@@ -39,9 +39,9 @@ const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (char) => 
 
 const FEE_SOURCES = [
   {
-    title: "Aster 永续",
+    title: "BN 钱包/Aster 永续",
     status: "已计入",
-    detail: "默认按 Aster 永续基础档 Maker 0.0050%、Taker 0.0400%，可在设置中改为你的账户费率。",
+    detail: "BN 钱包永续由 Aster 提供，默认按 Aster 基础档 Maker 0.0050%、Taker 0.0400%，可在设置中改为你的账户费率。",
     href: "https://docs.asterdex.com/trading/perpetuals/fees-and-specs/fees",
   },
   {
@@ -53,7 +53,7 @@ const FEE_SOURCES = [
   {
     title: "资金费数据",
     status: "实时读取",
-    detail: "Aster 使用 premiumIndex/fundingRate；Hyperliquid 使用 metaAndAssetCtxs、l2Book 和 fundingHistory。",
+    detail: "BN 钱包侧使用 Aster premiumIndex/fundingRate；Hyperliquid 使用 metaAndAssetCtxs、l2Book 和 fundingHistory。",
     href: "https://github.com/asterdex/api-docs",
   },
   {
@@ -64,8 +64,8 @@ const FEE_SOURCES = [
   },
 ];
 
-function asterFuturesUrl(item) {
-  return `https://www.asterdex.com/en/futures/${encodeURIComponent(item.venue_a_symbol || item.symbol)}`;
+function bnWalletFuturesUrl(item) {
+  return `https://web3.binance.com/en/perpetuals/${encodeURIComponent(item.venue_a_symbol || item.symbol)}`;
 }
 
 function hyperliquidUrl(item) {
@@ -73,7 +73,7 @@ function hyperliquidUrl(item) {
 }
 
 function venueA(item) {
-  return item.venue_a_exchange || "Aster";
+  return item.venue_a_exchange || "BN 钱包/Aster";
 }
 
 function venueB(item) {
@@ -84,8 +84,8 @@ function marketLinks(item, tone = "compact") {
   const labelClass = tone === "full" ? " full" : "";
   return `
     <div class="market-links${labelClass}">
-      <a class="market-link futures" href="${asterFuturesUrl(item)}" target="_blank" rel="noreferrer" title="打开 Aster 合约 ${escapeHtml(item.venue_a_symbol || item.symbol)}">
-        <i data-lucide="external-link"></i><span>Aster</span>
+      <a class="market-link futures" href="${bnWalletFuturesUrl(item)}" target="_blank" rel="noreferrer" title="打开 BN 钱包合约 ${escapeHtml(item.venue_a_symbol || item.symbol)}">
+        <i data-lucide="external-link"></i><span>BN钱包</span>
       </a>
       <a class="market-link stock" href="${hyperliquidUrl(item)}" target="_blank" rel="noreferrer" title="打开 Hyperliquid 合约 ${escapeHtml(item.hyper_coin || item.venue_b_symbol || item.symbol)}">
         <i data-lucide="external-link"></i><span>Hyper</span>
@@ -169,7 +169,7 @@ function renderStatus() {
   if (source === "demo" || source === "error" || source === "stale") {
     banner.classList.remove("hidden");
     if (source === "stale") {
-      $("#data-banner-text").textContent = `实时刷新暂时失败，当前保留上一份真实行情，请核对 Aster 和 Hyperliquid 页面后再交易。原因：${summarizeSourceError(error) || "未知错误"}`;
+      $("#data-banner-text").textContent = `实时刷新暂时失败，当前保留上一份真实行情，请核对 BN 钱包和 Hyperliquid 页面后再交易。原因：${summarizeSourceError(error) || "未知错误"}`;
     } else if (source === "demo") {
       $("#data-banner-text").textContent = `当前显示演示数据，不可用于交易判断。${error ? `实时接口原因：${summarizeSourceError(error)}` : "已手动启用演示模式。"}`;
     } else {
@@ -386,10 +386,10 @@ function renderDetail() {
         <div class="detail-block-title">测算公式</div>
         <div class="formula-stack">
           <div class="formula-line"><span>对冲名义</span><strong>总资金 / 2 × 杠杆</strong><em>${money(halfCapital)} × ${leverage.toFixed(1)} = ${money(projection.hedge_notional)}</em></div>
-          <div class="formula-line"><span>费差年化</span><strong>|Aster 单期费率 × 24 / Aster周期 × 365 - Hyper 单期费率 × 24 / Hyper周期 × 365|</strong><em>|${percent(item.binance_funding_rate, 4)} × 24 / ${hours(item.binance_funding_interval_hours)} × 365 - ${percent(item.okx_funding_rate, 4)} × 24 / ${hours(item.okx_funding_interval_hours)} × 365| = ${percent(item.annualized_current)}</em></div>
+          <div class="formula-line"><span>费差年化</span><strong>|BN 钱包侧单期费率 × 24 / BN 钱包侧周期 × 365 - Hyper 单期费率 × 24 / Hyper周期 × 365|</strong><em>|${percent(item.binance_funding_rate, 4)} × 24 / ${hours(item.binance_funding_interval_hours)} × 365 - ${percent(item.okx_funding_rate, 4)} × 24 / ${hours(item.okx_funding_interval_hours)} × 365| = ${percent(item.annualized_current)}</em></div>
           <div class="formula-line"><span>资金费</span><strong>对冲名义 × 当前费差年化 × 持有天数 / 365</strong><em>${money(projection.hedge_notional)} × ${percent(item.annualized_current)} × ${Number(settings.holding_days || 0)} / 365 = ${money(projection.gross_funding)}</em></div>
           <div class="formula-line"><span>价差贡献</span><strong>对冲名义 × 入场价差 bps / 10000</strong><em>${money(projection.hedge_notional)} × ${Number(item.entry_basis_bps || 0).toFixed(1)} / 10000 = ${money(projection.entry_basis_pnl)}</em></div>
-          <div class="formula-line"><span>单边费用</span><strong>Aster 手续费 + Hyper 手续费 + 双腿滑点 + 额外预留</strong><em>${money(projection.binance_open_fee)} + ${money(projection.okx_open_fee)} + ${money(projection.slippage_open)} + ${money(projection.extra_open_fee)} = ${money(projection.opening_cost)}</em></div>
+          <div class="formula-line"><span>单边费用</span><strong>BN 钱包/Aster 手续费 + Hyper 手续费 + 双腿滑点 + 额外预留</strong><em>${money(projection.binance_open_fee)} + ${money(projection.okx_open_fee)} + ${money(projection.slippage_open)} + ${money(projection.extra_open_fee)} = ${money(projection.opening_cost)}</em></div>
           <div class="formula-line"><span>总费用</span><strong>2 × 单边费用</strong><em>2 × ${money(projection.opening_cost)} = ${money(costs.total)}</em></div>
           <div class="formula-line total"><span>净收益</span><strong>资金费 + 价差贡献 - 总费用</strong><em>${money(projection.gross_funding)} ${signedMoney(projection.entry_basis_pnl)} - ${money(costs.total)} = ${money(projection.net_profit)}</em></div>
         </div>

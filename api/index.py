@@ -24,7 +24,7 @@ from app.service import MonitorService  # noqa: E402
 
 db = Database(config.database_path)
 service = MonitorService(db)
-app = FastAPI(title="CXMT Basis Monitor API", version="3.0.0")
+app = FastAPI(title="BN Wallet CXMT Basis Monitor API", version="3.1.0")
 
 
 async def current_snapshot() -> dict:
